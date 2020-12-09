@@ -1,0 +1,6 @@
+#ignore folder
+bin
+.vscode
+
+#ignore obj files
+*.o
