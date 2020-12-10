@@ -5,8 +5,9 @@
 #include <functional>
 #include <type_traits>
 #include <concepts>
+#include <string>
 
-//TODO : inline constexpr
+#include "utils.h"
 
 using parser_string = std::string_view;
 
@@ -25,23 +26,16 @@ struct is_parser_result<parser_result<T>>: std::true_type{};
 template<class T >
 concept parseable = is_parser_result<result_type<T>>{} == true;
 
-template<class T1 , class T2>
-concept add = requires (T1 t1 , T2 t2){ 
-    t1 + t2;
-};
-
 template<parseable T>
 struct parser_traits:std::true_type{
     using type = result_type<T>::value_type::first_type;
 };
 
-template<class T>
-struct parser_t{
-    std::function<parser_result<T>(parser_string)> _f;
-    template<parseable F>
-    parser_t(F && f) noexcept
-    : _f(std::move(f)){}
-};
+template<class T1 , class T2>
+concept same_parser = 
+    parseable<T1> && 
+    parseable<T2> && 
+    std::is_same_v<typename parser_traits<T1>::type ,typename parser_traits<T2>::type>;
 
 //three primitive parser
 
@@ -68,15 +62,10 @@ constexpr auto item = [](parser_string str)->parser_result<char> {
 //parser a -> parser b -> parser (a,b)
 template<parseable P1 , parseable P2>
 constexpr auto seq(P1 && p1 , P2 && p2){
-    using T1 = typename parser_traits<P1>::type;
-    using T2 = typename parser_traits<P2>::type;
-
-    return [p1 = std::forward<P1>(p1) , p2 = std::forward<P2>(p2)](parser_string str)->parser_result<std::tuple<T1,T2>>{
-        auto r1 = p1(str);
-        if(!r1) return std::nullopt;
-        auto r2 = p2(r1.second);
-        if(!r2) return std::nullopt;
-        return std::pair{std::tuple{r1.first , r2.first} , r2.second};
+    return [p1 = std::forward<P1>(p1) , p2 = std::forward<P2>(p2)](parser_string str)->auto{
+        if      (auto r1 = p1(str);!r1) return std::nullopt;
+        else if (auto r2 = p2(r1.second);!r2) return std::nullopt;
+        else    return  std::pair{cat_tuple(r1.first , r2.first) , r2.second};
     };
 }
 
@@ -94,14 +83,20 @@ constexpr auto bind(P1 && p1 , F && f) requires std::is_invocable_v<F , typename
     };
 }
 
+//parser a -> parser a -> parser a
+template<parseable P1 , parseable P2>
+constexpr auto plus(P1 && p1 , P2 && p2) requires same_parser<P1 ,P2> {
+    using T1 = typename parser_traits<P1>::type;
+    return [p1 = std::forward<P1>(p1) , p2 = std::forward<P2>(p2)](parser_string str)->parser_result<T1>{
+        if(auto r1 = p1(str); r1) return r1;
+        if(auto r2 = p2(str); r2) return r2;
+        return {};
+    };
+};
+
 template<parseable P1 , class F>
 constexpr auto operator >>= (P1 && p1 , F && f){
     return bind(std::forward<P1>(p1) , std::forward<F>(f));
-}
-
-template<parseable P1 , parseable P2>
-constexpr auto operator + (P1 && p1 , P2 && p2){    
-    return seq(std::forward<P1>(p1) , std::forward<P2>(p2));
 }
 
 //more combinators
@@ -121,12 +116,39 @@ constexpr auto onechar(char c){
 }
 
 template<class T>
-constexpr auto range(T a , T b){
+constexpr auto in_range(T a , T b){
     return satisfy([=](std::same_as<T> auto x)->bool{return x >= a && x < b; });
 }
 
-constexpr auto digit = range('0' , '9');
+constexpr auto digit = in_range('0' , '9');
 
-constexpr auto lower = range('a' , 'z');
+constexpr auto lower = in_range('a' , 'z');
 
-constexpr auto upper = range('A' , 'Z');
+constexpr auto upper = in_range('A' , 'Z');
+
+constexpr auto letter = plus(lower , upper);
+
+constexpr auto alphanum = plus(letter , digit);
+
+//foward declearation to avoid recursive combinator usage
+constexpr auto word(std::string_view str) -> parser_result<std::string_view>;
+
+constexpr auto neword = 
+    letter >>=  [=](char c){return 
+    word >>=    [=](std::string_view res){return 
+        result(str.substr(0 ,res.size() + 1));  // instead of string concat operation
+    };};
+
+constexpr auto word(std::string_view str) -> parser_result<std::string_view> {
+    using namespace std::literals;
+    return plus(neword , result(""sv))(str);
+}
+
+constexpr auto string =  [](std::string_view word){
+    return [=](std::string_view str) -> parser_result<std::string_view>{
+        if(str.length() < word.length() || !str.starts_with(word))   
+            return {};
+        else 
+            return std::pair{word , str.substr(word.length())};
+    };
+};
