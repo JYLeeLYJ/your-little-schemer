@@ -8,7 +8,6 @@ CXXFLAG := $(OPT) $(LINK) -Wall -std=$(CPPSTANDARD) $(DEFINE)
 INCLUDE := ./parser
 TEST_SRC := ./test
 
-
 TARGET := bin/main
 SRC_FILE := main.cpp
 
@@ -16,5 +15,8 @@ release: $(SRC_FILE)
 	$(CXX) $(SRC_FILE) -o $(TARGET) $(CXXFLAG)
 
 test : $(INCLUDE)/*.h $(TEST_SRC)/*.cpp
-	$(CXX) $(TEST_SRC)/*.cpp -o bin/testconcept $(CXXFLAG) -I./ -lgtest -lpthread
-	./bin/testconcept
+	$(CXX) $(TEST_SRC)/*.cpp -o bin/test $(CXXFLAG) -I./ -lgtest -lpthread
+	./bin/test
+
+clean : 
+	rm -rf bin/*
