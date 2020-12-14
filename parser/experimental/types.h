@@ -27,7 +27,7 @@ concept parseable = is_parser_result<result_type<T>>{} == true;
 
 template<parseable T>
 struct parser_traits:std::true_type{
-    using type = result_type<T>::value_type::first_type;
+    using type = typename result_type<T>::value_type::first_type;
 };
 
 template<class F , class P>
@@ -53,13 +53,15 @@ constexpr auto parser(parser_result<T>(* p)(parser_string)){
 
 // simple type system
 
+// kind should be class template 
+// alias template will lead to mismatch problem on gcc10 or clang10 
 template<template <typename ...> class kind>
 struct hkt{
     template<class T>
-    struct is_kind_instance : std::false_type{};
+    struct match_kind : std::false_type{};
 
     template<class ...Arg>
-    struct is_kind_instance<kind<Arg...>> : std::true_type{}; 
+    struct match_kind<kind<Arg...>> : std::true_type{}; 
 };
 
 //denote product type
@@ -73,20 +75,20 @@ struct product_type {
 };
 
 template<class T>
-using is_product = hkt<product_type>::is_kind_instance<T>;
+constexpr bool is_product = hkt<product_type>::match_kind<T>{};
 
 template<class L , class R>
 constexpr auto product(L && lhs, R && rhs){
     using TL = std::remove_cvref_t<L>;
     using TR = std::remove_cvref_t<R>;
-    if constexpr (is_product<TL>{})
-        if constexpr(is_product<TR>{}) 
+    if constexpr (is_product<TL>)
+        if constexpr(is_product<TR>) 
             return product_type{std::tuple_cat(std::forward<L>(lhs).tp , std::forward<R>(rhs).tp)};
         else 
-            return product_type{std::tuple_cat(std::forward<L>(lhs).tp , std::tuple{std::forward<R>(rhs)})};
+            return product_type{std::tuple_cat(std::forward<L>(lhs).tp , std::tuple<TR>{std::forward<R>(rhs)})};
     else 
-        if constexpr (is_product<TR>{})
-            return product_type{std::tuple_cat(std::tuple{std::forward<L>(lhs)} , std::forward<R>(rhs).tp)};
+        if constexpr (is_product<TR>)
+            return product_type{std::tuple_cat(std::tuple<TL>{std::forward<L>(lhs)} , std::forward<R>(rhs).tp)};
         else 
             return product_type{std::tuple(std::forward<L>(lhs) , std::forward<R>(rhs))};
 }
@@ -99,3 +101,14 @@ constexpr auto product(L && lhs, R && rhs){
 
 // template<class T>
 // using is_sum = hkt<sum_type>::is_kind_instance<T>;
+
+constexpr inline auto fix =  []
+    (auto&& f){
+        auto g = [&f](auto&& h){
+            return [&f, &h]
+            (auto&& ...x) { 
+                return f(h(h))(std::forward<decltype(x)>(x)...);
+            };
+        };
+        return g(g);
+    };

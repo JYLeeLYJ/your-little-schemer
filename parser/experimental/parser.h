@@ -1,51 +1,51 @@
 #pragma once
+
+#include <string>
+#include <concepts>
+
+#include "utils.h"
 #include "combinator.h"
 
-auto digit (parser_string str) -> parser_result<char>{
-    static const auto _digit = range('0' , '9');
-    return _digit(str);
-}
+inline parser_t<char> digit = range('0' , '9');
 
-auto lower (parser_string str) -> parser_result<char>{
-    static const auto _lower = range('a' , 'z');
-    return _lower(str);
-}
+inline parser_t<char> upper = range('A' , 'Z');
 
-auto upper (parser_string str) -> parser_result<char>{
-    static const auto _upper = range('A' , 'Z');
-    return _upper(str);
-}
+inline parser_t<char> lower = range('a' , 'z');
 
-auto letter (parser_string str) -> parser_result<char>{
-    static const auto _letter = parser(upper) | parser(lower);
-    return _letter(str);
-}
+inline parser_t<char> letter = upper | lower ;
 
-auto alphanum(parser_string str)-> parser_result<char>{
-    static const auto _alphanum = parser(letter) | parser(digit);
-    return _alphanum(str);
-}
+inline parser_t<char> alphanum = letter | digit ;
 
-// auto word(std::string_view str) -> parser_result<std::string_view> {
-//     using namespace std::literals;
-    
-//     auto neword = 
-//     letter  >>= [=](char c)                 {return 
-//     word    >>= [=](std::string_view res)   {return 
-//         result(str.substr(0 ,res.size() + 1));  // instead of concat
-//     };};
+inline parser_t<std::string> word = 
+    fix([](auto && word) -> parser_t<std::string>{
+        using namespace std::literals;
+        return plus(
+            ((letter + word) >>= [](const product_type<char , std::string> & tp){
+                auto &&[ch , xs] = tp.tp;
+                return result(ch + xs);
+            }) 
+            , result(std::string{})
+        );
+    });
 
-//     return plus(neword , result(""sv))(str);
-// }
+template<std::integral T>
+inline parser_t<T> natural = many1(digit) 
+    >>= [](auto && forward_list) {
+        return result(char_list_to_integer<T>(forward_list));
+    };
 
-auto word(std::string_view str) -> parser_result<std::string_view> {
-    using namespace std::literals;
-    static const auto neword = 
-        (parser(letter) + parser(word)) 
-        >>= [=](auto && tp){
-            auto &&[_ , xs] = tp.tp;
-            return result(str.substr(0,xs.size() + 1));
-        };
-    static const auto _word = (neword | result(""sv));
-    return _word(str);
-}
+template<std::integral T>
+inline parser_t<T> negative = (onechar('-') + natural<T>) 
+    >>= [](auto && tp){ 
+        return result(-std::get<1>(tp.tp)); 
+    };
+
+template<std::integral T>
+inline parser_t<T> integer = natural<T> | negative<T> ;
+
+//parser [int]
+inline auto ints = bracket(
+        onechar('[') , 
+        sepby1(integer<int> , onechar(',')) , 
+        onechar(']')
+    );
