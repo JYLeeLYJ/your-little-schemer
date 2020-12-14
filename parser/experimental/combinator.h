@@ -14,7 +14,8 @@ auto zero (parser_string str) -> parser_result<T>{
 
 //parser char
 auto item (parser_string str) -> parser_result<char>{
-    return std::pair{str[0] , str.substr(1)};
+    using namespace std::literals;
+    return std::pair{str[0] , str.empty() ? ""sv : str.substr(1)};
 }
 
 //basic monadic combinator
@@ -134,10 +135,14 @@ auto many(P && p) -> parser_t<std::forward_list<typename parser_traits<P>::type>
         return many(p)(str);
     };
     return plus(
-        ((p + many_p) >>= []( auto && tp){
-            auto && [x ,xs] = tp.tp;
-            return result((xs.push_front(std::move(x)) , std::move(xs)));
-        }),
+        // ((p + many_p) >>= []( auto && tp){
+        //     auto && [x ,xs] = tp.tp;
+        //     return result((xs.push_front(std::move(x)) , std::move(xs)));
+        // }),
+        p       >>= [=](data_type x)                     -> auto {return
+        many(p) >>= [x = std::move(x)](list_type && xs)  -> auto {return 
+            result((xs.push_front(std::move(x)) , std::move(xs)));
+        };},
         result(list_type{})
     );
 } 
