@@ -93,15 +93,6 @@ constexpr auto product(L && lhs, R && rhs){
             return product_type{std::tuple(std::forward<L>(lhs) , std::forward<R>(rhs))};
 }
 
-//denote sum type
-// template<class ...Ts>
-// struct sum_type {
-//     std::variant<Ts...> var;
-// };
-
-// template<class T>
-// using is_sum = hkt<sum_type>::is_kind_instance<T>;
-
 constexpr inline auto fix =  []
     (auto&& f){
         auto g = [&f](auto&& h){

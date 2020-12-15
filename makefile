@@ -15,7 +15,7 @@ release: $(SRC_FILE)
 	$(CXX) $(SRC_FILE) -o $(TARGET) $(CXXFLAG)
 
 test : $(INCLUDE)/*.h $(TEST_SRC)/*.cpp
-	$(CXX) $(TEST_SRC)/*.cpp -o bin/test $(CXXFLAG) -I./ -lgtest -lpthread
+	$(CXX) $(TEST_SRC)/*.cpp -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread
 	./bin/test
 
 clean : 

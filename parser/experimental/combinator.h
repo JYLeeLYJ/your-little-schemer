@@ -4,7 +4,9 @@
 
 #include "types.h"
 
-//basic monadic parser
+//basic monadic definition 
+
+//monad , monad plus , applicative , functor
 
 //parser a
 template<class T>
@@ -14,8 +16,8 @@ auto zero (parser_string str) -> parser_result<T>{
 
 //parser char
 auto item (parser_string str) -> parser_result<char>{
-    using namespace std::literals;
-    return std::pair{str[0] , str.empty() ? ""sv : str.substr(1)};
+    if(str.empty()) return {};
+    else            return std::pair{str[0] , str.substr(1)};
 }
 
 //basic monadic combinator
@@ -95,8 +97,8 @@ parseable auto operator |(P1 && p1 , P2 && p2)  {
 template<std::predicate<char> Pred>
 parseable auto satisfy(Pred && predicate) {
     return item 
-    >>= [p = std::forward<Pred>(predicate)](char x)-> parser_t<char>{
-        if (p(x)) return result(x);  
+    >>= [=](char x)-> parser_t<char>{
+        if (predicate(x)) return result(x);  
         else return zero<char>;
     };
 }
@@ -131,14 +133,7 @@ auto many(P && p) -> parser_t<std::forward_list<typename parser_traits<P>::type>
     using data_type = typename parser_traits<P>::type;
     using list_type = std::forward_list<data_type>;
 
-    auto many_p = [=](parser_string str)->parser_result<list_type>{
-        return many(p)(str);
-    };
     return plus(
-        // ((p + many_p) >>= []( auto && tp){
-        //     auto && [x ,xs] = tp.tp;
-        //     return result((xs.push_front(std::move(x)) , std::move(xs)));
-        // }),
         p       >>= [=](data_type x)                     -> auto {return
         many(p) >>= [x = std::move(x)](list_type && xs)  -> auto {return 
             result((xs.push_front(std::move(x)) , std::move(xs)));
@@ -159,7 +154,6 @@ parseable auto many1(P && p){
 //parser a -> parser b -> parser [a]
 template<parseable P , parseable Sep>
 parseable auto sepby1( P && p , Sep && sep) {
-
     auto repeat = (sep + p) >>= [](auto && tp){
         return result(std::move(std::get<1>(tp.tp)));
     };
@@ -185,3 +179,53 @@ parseable auto bracket( Open && open , P && p ,  Close && close){
     };
 }
 
+//parser a -> parser (a -> a -> a) -> parser a
+template<parseable T , parseable Op>
+auto chainl1(T && p , Op && op) -> parser_t<typename parser_traits<T>::type> {
+    using TA = typename parser_traits<T>::type ;
+    using TOp= typename parser_traits<Op>::type;
+
+    static_assert(std::is_invocable_v<TOp , TA , TA>);
+
+    return (p + many(op + p))
+        >>= [](auto && tp){
+            auto && [ x , fys ] = tp.tp;
+            for(auto && fy : fys){
+                auto && [op , y] = fy.tp;
+                x = op(x , y);
+            }
+            return result(x);
+        };
+}
+
+//chainr1
+template<parseable T , parseable Op>
+auto chainr1(T && p , Op && op) -> parser_t<typename parser_traits<T>::type >{
+    using TA = typename parser_traits<T>::type ;
+    using TOp= typename parser_traits<Op>::type;
+
+    static_assert(std::is_invocable_v<TOp , TA , TA>);
+
+    return p >>= [=](auto && x){ return(
+        op              >>= [=](auto && f) {return 
+        chainr1(p , op) >>= [=](auto && y) {return
+            f(x , y);
+        }; })
+        | result(x);
+    };
+}
+
+//chainl
+
+template<parseable T1 , parseable Op , parseable T2>
+requires same_parser<T1,T2>
+auto chainl(T1 && p , Op && op , T2 &&  v) -> parser_t<typename parser_traits<T1>::type >{
+    return chainl1(std::forward<P>(p) , std::forward<Op>(op)) | result(std::forward<T2>(v));
+}
+//chainr
+
+template<parseable T1 , parseable Op , parseable T2>
+requires same_parser<T1,T2>
+auto chainr(T1 && p , Op && op , T2 &&  v) -> parser_t<typename parser_traits<T1>::type >{
+    return chainr1(std::forward<P>(p) , std::forward<Op>(op)) | result(std::forward<T2>(v));
+}
