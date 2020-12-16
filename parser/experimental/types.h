@@ -5,6 +5,7 @@
 #include <optional>
 #include <type_traits>
 #include <variant>
+#include <experimental/type_traits>
 
 using parser_string = std::string_view;
 
@@ -12,7 +13,7 @@ template<class T>
 using parser_result = std::optional<std::pair<T , parser_string>>;
 
 template<class T>
-using result_type = std::result_of_t<T(std::string_view)>;
+using result_type = std::invoke_result_t<T ,std::string_view>;
 
 template<class T>
 struct is_parser_result 
@@ -28,6 +29,11 @@ concept parseable = is_parser_result<result_type<T>>{} == true;
 template<parseable T>
 struct parser_traits:std::true_type{
     using type = typename result_type<T>::value_type::first_type;
+};
+
+template<class F>
+concept callable = requires (F f){
+    typename decltype(std::function{f})::result_type;
 };
 
 template<class F , class P>
@@ -103,3 +109,35 @@ constexpr inline auto fix =  []
         };
         return g(g);
     };
+
+template<class T, typename... Args>
+using can_invoke_t = decltype(std::declval<T>()(std::declval<Args>()...));
+
+template<typename T, typename... Args>
+constexpr bool can_invoke = std::experimental::is_detected_v<can_invoke_t, T, Args...>;
+
+template <typename F, typename...Arguments>
+struct curry_t {
+    template <typename...Args>
+    constexpr decltype(auto) operator()(Args&&...a)  const {
+        curry_t<F, Arguments..., Args...> cur = { f_,
+            std::tuple_cat(args_, std::make_tuple(std::forward<Args>(a)...)) };
+
+        if constexpr (!can_invoke<F, Arguments..., Args...>) 
+            return cur;
+        else 
+            return cur();
+    }
+
+    constexpr decltype(auto) operator () () const {
+        return std::apply(f_, args_);
+    }
+
+    F f_;
+    std::tuple<Arguments...> args_;
+};
+
+template<typename F>
+constexpr curry_t<F> make_curry(F&& f) {
+    return { std::forward<F>(f) };
+}
