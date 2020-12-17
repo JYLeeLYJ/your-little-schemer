@@ -37,9 +37,9 @@ concept callable = requires (F f){
 };
 
 template<class F , class P>
-concept bindable = requires(F f ,P p){
+concept bindable = requires(F f , P p){
     parseable<P>;
-    {f((typename parser_traits<P>::type){})} -> parseable;
+    parseable<std::invoke_result_t<F ,typename parser_traits<P>::type>>;
 };
 
 template<class T1 , class T2>
@@ -73,7 +73,10 @@ struct hkt{
 //denote product type
 template<class ...T>
 struct product_type {
-    std::tuple<T...> tp;
+
+    using tuple_type = std::tuple<T...>;
+
+    tuple_type tp;
 
     constexpr product_type() = default;
     constexpr product_type(std::tuple<T...> _tp)
@@ -99,16 +102,43 @@ constexpr auto product(L && lhs, R && rhs){
             return product_type{std::tuple(std::forward<L>(lhs) , std::forward<R>(rhs))};
 }
 
-constexpr inline auto fix =  []
-    (auto&& f){
-        auto g = [&f](auto&& h){
-            return [&f, &h]
-            (auto&& ...x) { 
-                return f(h(h))(std::forward<decltype(x)>(x)...);
-            };
+template<class ...Types>
+class std::tuple_size<product_type<Types...>>
+:public std::integral_constant<std::size_t, sizeof...(Types)>{};
+
+template<std::size_t I ,class ...Types>
+struct std::tuple_element<I , product_type<Types...>>{
+    using type = typename std::tuple_element<I,typename product_type<Types...>::tuple_type>::type;
+};
+
+template<std::size_t I , class ...Types>
+constexpr decltype(auto) get(product_type<Types...> & t) noexcept{
+    return std::get<I>(t.tp);
+}
+
+template<std::size_t I , class ...Types>
+constexpr decltype(auto) get(product_type<Types...> && t) noexcept{
+    return std::get<I>(std::move(t).tp);
+}
+
+template<std::size_t I , class ...Types>
+constexpr decltype(auto) get(const product_type<Types...> & t) noexcept{
+    return std::get<I>(t.tp);
+}
+
+template<std::size_t I , class ...Types>
+constexpr decltype(auto) get(const product_type<Types...> && t) noexcept{
+    return std::get<I>(std::move(t).tp);
+}
+
+constexpr inline decltype(auto) fix(auto&& f){
+    auto g = [&](auto&& h){
+        return [&](auto&& ...x) { 
+            return f(h(h))(std::forward<decltype(x)>(x)...);
         };
-        return g(g);
     };
+    return g(g);
+};
 
 template<class T, typename... Args>
 using can_invoke_t = decltype(std::declval<T>()(std::declval<Args>()...));

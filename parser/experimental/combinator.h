@@ -57,21 +57,21 @@ parseable auto lift(F && f) {
 
 template<parseable F , parseable P>
 requires std::is_invocable_v<typename parser_traits<F>::type , typename parser_traits<P>::type>
-parseable auto apply(F && f , P && p){
-    return bind( f , [=](auto && f){
-        return bind(p , [f](auto && p){
-            return result(f(std::move(p)));
+parseable auto apply(F && pf , P && p){
+    return bind( pf , [=](auto && f){
+        return bind(p , [f](auto && x){
+            return result(f(std::move(x)));
         });
     });
 }
 
 //functor
-// template<callable F , parseable P>
-// parseable auto fmap(F && f , P && p){
-//     return bind(p , [f = make_curry(f)](auto && p){
-//         return result( f(std::move(p)) );
-//     });
-// }
+template<callable F , parseable P>
+parseable auto fmap(F && f , P && p){
+    return bind(p , [f = make_curry(f)](auto && x){
+        return result( f(std::move(x)) );
+    });
+}
 
 //parser a -> parser b -> parser (a , b)
 template<parseable P1 , parseable P2>
@@ -101,6 +101,12 @@ parseable auto operator + (P1 && p1 , P2 && p2){
     // return apply(std::forward<P1>(p1) ,std::forward<P2>(p2));
 }
 
+template<parseable F , parseable P>
+requires callable<typename parser_traits<F>::type>
+parseable auto operator * (F && f , P && p ){
+    return apply(std::forward<F>(f) , std::forward<P>(p));
+}
+
 template<parseable P1 , parseable P2>
 requires same_parser<P1 ,P2>
 parseable auto operator |(P1 && p1 , P2 && p2)  {
@@ -111,7 +117,7 @@ template<parseable P1 , parseable P2>
 parseable auto operator >> (P1 && p1 , P2 && p2) {
     return seq(std::forward<P1>(p1) , std::forward<P2>(p2)) 
         >>= [](auto && tp){
-            auto && [_ , r] = tp.tp;
+            auto && [_ , r] = tp;
             return result(std::move(r));
         };
 }
@@ -120,7 +126,7 @@ template<parseable P1 , parseable P2>
 parseable auto operator << (P1 && p1 , P2 && p2){
     return seq(std::forward<P1>(p1) , std::forward<P2>(p2)) 
             >>= [](auto && tp){
-                auto && [l , _] = tp.tp;
+                auto && [l , _] = tp;
                 return result(std::move(l));
             };
 }
@@ -145,7 +151,7 @@ auto many(P && p) -> parser_t<std::forward_list<typename parser_traits<P>::type>
 template<parseable P>
 parseable auto many1(P && p){
     return (p + many(p)) >>= [](auto && tp){
-        auto && [x ,xs] = tp.tp;
+        auto && [x ,xs] = tp;
         return result((xs.push_front(std::move(x)) , std::move(xs)));
     };
 }
@@ -156,7 +162,7 @@ template<parseable P , parseable Sep>
 parseable auto sepby1( P && p , Sep && sep) {
     return (p + many(sep >> p)) 
     >>= [](auto && tp){
-        auto && [x , xs] = tp.tp;
+        auto && [x , xs] = tp;
         return result((xs.push_front(std::move(x)) , std::move(xs)));
     };
 }
@@ -182,9 +188,9 @@ auto chainl1(T && p , Op && op) -> parser_t<typename parser_traits<T>::type> {
 
     return (p + many(op + p))
         >>= [](auto && tp){
-            auto && [ x , fys ] = tp.tp;
+            auto && [ x , fys ] = tp;
             for(auto && fy : fys){
-                auto && [op , y] = fy.tp;
+                auto && [op , y] = fy;
                 x = op(x , y);
             }
             return result(x);

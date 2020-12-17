@@ -15,7 +15,7 @@ release: $(SRC_FILE)
 	$(CXX) $(SRC_FILE) -o $(TARGET) $(CXXFLAG)
 
 test : $(INCLUDE)/*.h $(TEST_SRC)/*.cpp
-	$(CXX) $(TEST_SRC)/*.cpp -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread -fconcepts-diagnostics-depth=10
+	$(CXX) $(TEST_SRC)/*.cpp -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread -lgtest_main -fconcepts-diagnostics-depth=10
 	./bin/test
 
 clean : 
