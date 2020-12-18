@@ -5,8 +5,9 @@
 
 #include "utils.h"
 #include "combinator.h"
+
 //parser char
-auto item (parser_string str) -> parser_result<char>{
+inline auto item (parser_string str) -> parser_result<char>{
     if(str.empty()) return {};
     else            return std::pair{str[0] , str.substr(1)};
 }
@@ -24,26 +25,37 @@ parseable auto satisfy(Pred && predicate) {
 }
 
 // a -> a -> parser a
-template<class T>
-parseable auto range(T l , T h){
-    return satisfy([=](const T & t){ return t >= l && t <= h;});
+inline parseable auto range(char l , char h){
+    return satisfy([=](char c){ return c >= l && c <= h;});
+}
+
+inline parseable auto oneof(std::string_view chs){
+    return satisfy([=](char ch){ return chs.find(ch) != chs.npos;});
 }
 
 //high-level combinators
 
 //char -> parser char
-parseable auto onechar(char ch){
+inline parseable auto onechar(char ch){
     return satisfy([=](char x)->bool{return x == ch;});
 }
 
 //string -> parser string
-auto string(std::string_view word) -> parser_t<std::string_view>{
+inline auto string(std::string_view word) -> parser_t<std::string_view>{
     using namespace std::literals;
     if(word.empty()) return result(""sv);
     else return 
         (onechar(word[0]) + string(word.substr(1))) 
         >>= [=](auto && _) {return result(word);};
 };
+
+inline parseable auto operator ""_char (char ch) {
+    return onechar(ch);
+}
+
+inline parseable auto operator ""_string(const char * word){
+    return string(word);
+}
 
 inline parser_t<char> digit = range('0' , '9');
 
@@ -67,11 +79,12 @@ inline parser_t<std::string> word =
         );
     });
 
+
 template<std::integral T>
-inline parser_t<T> natural = many1(digit) 
-    >>= [](auto && forward_list) {
-        return result(char_list_to_integer<T>(forward_list));
-    };
+inline parser_t<T> natural = lift(char_list_to_integer<int>) * many1(digit);
+    // >>= [](auto && forward_list) {
+    //     return result(char_list_to_integer<T>(forward_list));
+    // };
 
 template<std::integral T>
 inline parser_t<T> negative = (onechar('-') >> natural<T>) 
@@ -81,8 +94,12 @@ template<std::integral T>
 inline parser_t<T> integer = natural<T> | negative<T> ;
 
 //parser [int]
-inline auto ints = bracket(
-        onechar('[') , 
-        sepby1(integer<int> , onechar(',')) , 
-        onechar(']')
-    );
+inline auto ints = onechar('[') >> sepby1(integer<int> , onechar(',')) << onechar(']');
+
+//Lexial 
+
+inline auto newline = '\n'_char;
+
+inline auto is_space = ' '_char | '\n'_char | '\t'_char;
+
+inline auto spaces = many(is_space);

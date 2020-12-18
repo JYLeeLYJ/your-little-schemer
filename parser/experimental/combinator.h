@@ -102,7 +102,6 @@ parseable auto operator + (P1 && p1 , P2 && p2){
 }
 
 template<parseable F , parseable P>
-requires callable<typename parser_traits<F>::type>
 parseable auto operator * (F && f , P && p ){
     return apply(std::forward<F>(f) , std::forward<P>(p));
 }

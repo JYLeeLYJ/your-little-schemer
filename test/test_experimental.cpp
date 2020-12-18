@@ -64,10 +64,15 @@ TEST(test_functional , test_functor){
 
 }
 
+template<class T>
+T inc(T x){return ++x;}
+
+// template int inc<>(int);
+
 TEST(test_functional , test_applicative){
 
-    auto inc = [](int x){return ++x;};
-    auto get_int = apply(lift(inc) , natural<int>);
+    // int a = inc(1);
+    auto get_int = lift(inc<int>) * natural<int> ;
 
     auto res = get_int("114514");
     EXPECT_TRUE(res);
