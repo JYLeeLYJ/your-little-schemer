@@ -12,8 +12,6 @@ inline auto item (parser_string str) -> parser_result<char>{
     else            return std::pair{str[0] , str.substr(1)};
 }
 
-// more combinators
-
 // (char -> bool) -> parser char
 template<std::predicate<char> Pred>
 parseable auto satisfy(Pred && predicate) {
@@ -29,11 +27,10 @@ inline parseable auto range(char l , char h){
     return satisfy([=](char c){ return c >= l && c <= h;});
 }
 
+//[char] -> parser [char]
 inline parseable auto oneof(std::string_view chs){
     return satisfy([=](char ch){ return chs.find(ch) != chs.npos;});
 }
-
-//high-level combinators
 
 //char -> parser char
 inline parseable auto onechar(char ch){
@@ -82,19 +79,16 @@ inline parser_t<std::string> word =
 
 template<std::integral T>
 inline parser_t<T> natural = lift(char_list_to_integer<int>) * many1(digit);
-    // >>= [](auto && forward_list) {
-    //     return result(char_list_to_integer<T>(forward_list));
-    // };
 
 template<std::integral T>
-inline parser_t<T> negative = (onechar('-') >> natural<T>) 
-    >>= [](T && t) {return result(-t) ;};
+inline parser_t<T> negative = lift(std::negate<T>{}) * ('-'_char >> natural<T>) ;
 
 template<std::integral T>
 inline parser_t<T> integer = natural<T> | negative<T> ;
 
 //parser [int]
-inline auto ints = onechar('[') >> sepby1(integer<int> , onechar(',')) << onechar(']');
+template<std::integral T>
+inline auto ints = '['_char >> sepby1(integer<T> , ','_char ) << ']'_char;
 
 //Lexial 
 
