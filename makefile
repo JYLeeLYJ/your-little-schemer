@@ -1,7 +1,7 @@
 # compiling vars
 CXX := g++
 CPPSTANDARD := c++20
-OPT := -O2
+OPT := -O3
 LINK:= -ledit
 DEFINE := -DFMT_HEADER_ONLY
 CXXFLAG := $(OPT) $(LINK) -Wall -std=$(CPPSTANDARD) $(DEFINE)
@@ -20,12 +20,19 @@ TEST_OBJS:= $(patsubst %.cpp,$(TEMP_OBJ_DIR)/%.o,$(notdir $(TEST_FILES)))
 release: $(SRC_FILE)
 	$(CXX) $(SRC_FILE) -o $(TARGET) $(CXXFLAG)
 
-test : $(TEST_OBJS)
+test : bin $(TEMP_OBJ_DIR) $(TEST_OBJS)
 	$(CXX) $(TEST_OBJS) -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread -lgtest_main 
 	./bin/test
 
 $(TEMP_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.cpp $(INCLUDE)/*.h 
 	$(CXX) $< -o $@ -c $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -fconcepts-diagnostics-depth=10 
 
+bin:
+	@mkdir -p bin
+
+$(TEMP_OBJ_DIR):
+	@mkdir -p $(TEMP_OBJ_DIR)
+
 clean : 
 	rm -rf bin/*
+	rm -rf tmp/*

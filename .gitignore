@@ -1,5 +1,6 @@
 #ignore folder
 bin
+tmp
 .vscode
 
 #ignore obj files
