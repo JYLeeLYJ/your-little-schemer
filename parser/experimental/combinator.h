@@ -98,7 +98,6 @@ parseable auto operator >>= (P1 && p1 , F && f){
 template<parseable P1 , parseable P2>
 parseable auto operator + (P1 && p1 , P2 && p2){
     return seq(std::forward<P1>(p1) , std::forward<P2>(p2));
-    // return apply(std::forward<P1>(p1) ,std::forward<P2>(p2));
 }
 
 template<parseable F , parseable P>
@@ -204,13 +203,14 @@ auto chainr1(T && p , Op && op) -> parser_t<typename parser_traits<T>::type >{
 
     static_assert(std::is_invocable_v<TOp , TA , TA>);
 
-    return p >>= [=](auto && x){ return(
-        op              >>= [=](auto && f) {return 
-        chainr1(p , op) >>= [=](auto && y) {return
-            result (f(x , y));
-        }; })
+    return bind(p , [=](auto && x){
+        return bind(op , [=](auto && f){
+            return bind(chainr1(p , op) , [=](auto && y){
+                return result(f(x,y));
+            });
+        })
         | result(x);
-    };
+    });
 }
 
 //chainl
