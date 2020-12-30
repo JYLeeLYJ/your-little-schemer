@@ -1,4 +1,6 @@
+#pragma once
 #include<type_traits>
+#include <experimental/type_traits>
 
 template<template <typename ...> class kind>
 struct hkt{

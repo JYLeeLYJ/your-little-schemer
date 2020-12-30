@@ -1,8 +1,12 @@
+
+#ifndef NOTEST_EXPERIMENTAL
+
 #include "parser/parsec_experimental.h"
 
 #include <gtest/gtest.h>
 #include <type_traits>
 #include <vector>
+
 
 using namespace std::literals;
 
@@ -159,3 +163,5 @@ TEST(test_combinators , test_nums){
     auto ints_ls = std::forward_list{1,1};
     EXPECT_EQ(ints_res.value().first , ints_ls);
 }
+
+#endif

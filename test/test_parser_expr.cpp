@@ -1,6 +1,10 @@
 #include <cmath>
 #include <gtest/gtest.h>
+
+#ifndef NOTEST_EXPERIMENTAL
+
 #include "parser/parsec_experimental.h"
+
 
 using namespace std::literals;
 
@@ -49,3 +53,5 @@ TEST(test_parser , test_expr_parser){
     EXPECT_EQ(res_expr2->first , -4);
     EXPECT_EQ(res_expr2->second, ""sv);
 }
+
+#endif

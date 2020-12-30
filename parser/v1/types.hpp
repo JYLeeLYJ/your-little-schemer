@@ -1,3 +1,5 @@
+#pragma once
+
 #include <type_traits>
 #include <optional>
 #include <string_view>
@@ -6,11 +8,9 @@
 #include "functional.hpp"
 
 template<class T>
-class parser_result: std::optional<std::pair<T , std::string_view>>{
+class parser_result: public std::optional<std::pair<T , std::string_view>>{
 public:
     using std::optional<std::pair<T , std::string_view>>::optional;
-    using std::optional<std::pair<T , std::string_view>>::operator ==();
-
     using type = T;
 };
 
@@ -19,13 +19,14 @@ using parser_string = std::string_view;
 template<class T>
 using parser_func_t = parser_result<T> (*)(parser_string);
 
+//type erase for non capture constexpr lambda 
 template<class T>
 class parser_t{
 public:
-    constexpr parser_t(parser_func_t<T> f) noexcept  :_f(f){}
-    parser_result operator() (parser_string str)  noexcept{return _f(str);}
+    consteval parser_t(const parser_func_t<T> f) noexcept  :_f(f){}
+    constexpr parser_result<T> operator() (parser_string str) const noexcept{return _f(str);}
 private:
-    parser_func_t _f;
+    parser_func_t<T> _f;
 };
 
 template<class T>
