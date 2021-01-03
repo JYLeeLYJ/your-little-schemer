@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include "combinator.hpp"
 
 constexpr parser_result<char> item(parser_string str){
@@ -40,8 +39,8 @@ constexpr auto operator ""_char (char c){
     return onechar(c);
 }
 
-constexpr auto operator ""_string(const char * s){
-    return string(s);
+constexpr auto operator ""_str (const char * s , std::size_t len){
+    return string(std::string_view{s,len});
 }
 
 inline constexpr auto digit = range('0' , '9');
@@ -53,3 +52,7 @@ inline constexpr auto lower = range('a' , 'z');
 inline constexpr auto letter = upper | lower ;
 
 inline constexpr auto alphanum = letter | digit ;
+
+inline constexpr auto newline = '\n'_char;
+
+// inline constexpr auto spaces = many(' '_char | '\n'_char | '\t'_char);

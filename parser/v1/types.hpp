@@ -4,6 +4,8 @@
 #include <optional>
 #include <string_view>
 #include <functional>
+#include <version>
+#include <concepts>
 
 #include "functional.hpp"
 
@@ -19,11 +21,13 @@ using parser_string = std::string_view;
 template<class T>
 using parser_func_t = parser_result<T> (*)(parser_string);
 
-//type erase for non capture constexpr lambda 
+struct none_t{};
+
+/// type erase for non capture constexpr lambda 
 template<class T>
-class parser_t{
+class parser_lambda_t{
 public:
-    consteval parser_t(const parser_func_t<T> f) noexcept  :_f(f){}
+    constexpr parser_lambda_t(const parser_func_t<T> f) noexcept  :_f(f){}
     constexpr parser_result<T> operator() (parser_string str) const noexcept{return _f(str);}
 private:
     parser_func_t<T> _f;
@@ -40,7 +44,137 @@ concept Callable = requires(T t){
     typename decltype(std::function{t})::result_type;
 };
 
+template<class Container>
+concept ListContainer = 
+    std::ranges::sized_range<Container> && 
+    requires (Container c){
+        c.push_back(typename Container::value_type{});
+    };
+
 template<Parser P>
 struct parser_traits {
     using type = typename std::invoke_result_t<P,parser_string>::type;
 };
+
+#ifndef __cpp_lib_constexpr_vector
+#include <memory>
+#include <new>
+///simple vector support constexpr , cause constexpr std::vector is still unsupported.
+template<class T>
+class cvector : protected std::allocator<T>{
+public:
+    constexpr cvector() {
+        preserve(4);
+    }
+
+    constexpr cvector(const std::initializer_list<T> & ls) {
+        preserve(1.5 * ls.size());
+        for (std::size_t i = 0 ; const auto & x : ls){
+            new (_start+i) T(x);
+            ++i;
+        }
+        _n = ls.size();
+    }
+
+    constexpr cvector(const cvector & v){
+        preserve(v.capacity());
+        for (std::size_t i = 0 ; const auto & x : v){
+            new (_start+i) T(x);
+            ++i;
+        }
+        _n = v.size();
+    }
+
+    constexpr cvector(cvector && v) noexcept{
+        _n = v.size();              v._n = 0;
+        _n_storage = v.capacity();  v._n_storage = 0;
+        _start = v._start;          v._start = nullptr;
+    }
+
+    constexpr ~cvector() noexcept{
+        if(_start){
+            deconstruct_all();
+            this->deallocate(_start ,capacity());
+            _n_storage = _n = 0;
+            _start = nullptr;
+        }
+    }
+
+    constexpr cvector& operator = (const cvector & v){
+        deconstruct_all();
+        preserve(v.capacity());
+        for(std::size_t i = 0 ; auto & x : v){
+            new (_start + i) T(x);
+            ++i;
+        }
+        _n = v.size();
+    }
+
+    constexpr cvector & operator = (cvector && v) noexcept{
+        this->~cvector();
+        _n = v.size();              v._n = 0;
+        _n_storage = v.capacity();  v._n_storage = 0;
+        _start = v._start;          v._start = nullptr;
+    }
+
+public:
+    using iterator = T *;
+    using const_iterator = const T *;
+public:
+    constexpr std::size_t size() const { return _n;}
+    constexpr std::size_t capacity() const {return _n_storage;}
+    constexpr bool empty() const {return _n == 0;}
+
+    constexpr iterator begin(){return _start;}
+    constexpr iterator end(){return _start+_n;}
+    constexpr const_iterator begin() const {return _start;}
+    constexpr const_iterator end() const {return _start + _n;}
+
+    constexpr void push_back(T t){
+        if(size() == capacity()) 
+            preserve(2 * size());
+        new (_start + size()) T(std::move(t));
+        ++_n;
+    }
+
+    constexpr T & operator[] (std::size_t i){
+        if(i >= this->size()) throw std::out_of_range{};
+        return _start[i];
+    }
+
+    constexpr const T & operator [](std::size_t i) const{
+        if(i >= this->size()) throw std::out_of_range{};
+        return _start[i];
+    }
+
+private:
+
+    constexpr void preserve(std::size_t n){
+        if(_start == nullptr) {
+            _start = this->allocate(n);
+            if(_start == nullptr) throw std::bad_alloc{};
+            _n_storage = n;
+        }
+        else if( capacity() < n){
+            T* p = this->allocate(n);
+            if(p == nullptr)  throw std::bad_alloc{};
+            for(std::size_t i = 0 ; i < size() ; ++ i)
+                p[i] = std::move(_start[i]);
+            this->deallocate(_start , _n_storage);
+            _n_storage = n;
+            _start = p;
+        }
+    }
+
+    constexpr void deconstruct_all(){
+        for(auto & x : *this)
+            x.~T();
+        _n = 0;
+    }
+
+private:
+    std::size_t _n{0};
+    std::size_t _n_storage{0};
+    T * _start{nullptr};
+};
+#endif

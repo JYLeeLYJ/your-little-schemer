@@ -1,9 +1,12 @@
 #pragma once
+
+#include <ranges>
+
 #include "types.hpp"
 
 //a -> parser a
 template<class T>
-consteval auto result(T && t){
+constexpr auto result(T && t){
     return [=](parser_string str) -> parser_result<T>{
         return std::pair{t , str};
     };
@@ -29,7 +32,7 @@ constexpr auto zero(parser_string ) -> parser_result<T> {
 
 //(a->b) -> parser (a->b)
 template<Callable F>
-constexpr auto lift(F &&  f){
+constexpr Parser auto lift(F &&  f){
     return result(std::forward<F>(f));
 }
 
@@ -55,7 +58,7 @@ constexpr Parser auto plus(T1 && t1 , T2 && t2){
     };
 }
 
-//operator >> << >>= | *
+/// operator >> << >>= | *
 
 //bind operator
 template<Parser P , Callable F>
@@ -86,4 +89,36 @@ constexpr Parser auto operator << (P1 && p1 , P2 && p2 ){
         });
     });
 }
+
+template<Parser P>
+constexpr Parser auto skip(P p){
+    return bind(p , result<none_t>);
+}
+
+/// many , sepby , chainl , chainr
+
+// template<ListContainer Container ,Parser P >
+// constexpr Parser auto many1(P && p){
+//     return [=](parser_string str)->parser_result<Container>{
+//         Container c{};
+//         auto result = p(str);
+//         while(result){
+//             auto && [v , remain] = *result;
+//             if constexpr (requires {c.emplace_back();})
+//                 c.emplace_back(std::move(v));
+//             else 
+//                 c.push_back(std::move(v));
+//             result = p(remain);
+//         }
+//         if(c.size() == 0) return {};
+//         else return std::pair{std::move(c),result->second};
+//     };
+// }
+
+// template<ListContainer Container , Parser P >
+// constexpr Parser auto many(P && p){
+//     return many1<Container>(p) | result(Container{});
+// }
+
+
 
