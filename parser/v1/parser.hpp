@@ -2,6 +2,8 @@
 
 #include "combinator.hpp"
 
+namespace pscpp{
+    
 constexpr parser_result<char> item(parser_string str){
     if(str.empty()) return {};
     else return std::pair{str[0] , str.substr(1)};
@@ -55,4 +57,7 @@ inline constexpr auto alphanum = letter | digit ;
 
 inline constexpr auto newline = '\n'_char;
 
-// inline constexpr auto spaces = many(' '_char | '\n'_char | '\t'_char);
+inline constexpr auto spaces = many(skip(' '_char | '\n'_char | '\t'_char));
+
+};
+

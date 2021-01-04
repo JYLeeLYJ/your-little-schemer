@@ -9,6 +9,8 @@
 
 #include "functional.hpp"
 
+namespace pscpp{
+
 template<class T>
 class parser_result: public std::optional<std::pair<T , std::string_view>>{
 public:
@@ -20,8 +22,6 @@ using parser_string = std::string_view;
 
 template<class T>
 using parser_func_t = parser_result<T> (*)(parser_string);
-
-struct none_t{};
 
 /// type erase for non capture constexpr lambda 
 template<class T>
@@ -56,9 +56,16 @@ struct parser_traits {
     using type = typename std::invoke_result_t<P,parser_string>::type;
 };
 
+struct none_t {};
+
+constexpr bool operator==(const none_t & lhs , const none_t & rhs){
+    return true;
+}
+
 #ifndef __cpp_lib_constexpr_vector
 #include <memory>
 #include <new>
+#include <initializer_list>
 ///simple vector support constexpr , cause constexpr std::vector is still unsupported.
 template<class T>
 class cvector : protected std::allocator<T>{
@@ -66,11 +73,10 @@ public:
     constexpr cvector() {
         preserve(4);
     }
-
     constexpr cvector(const std::initializer_list<T> & ls) {
         preserve(1.5 * ls.size());
         for (std::size_t i = 0 ; const auto & x : ls){
-            new (_start+i) T(x);
+            std::construct_at(_start+i , x); 
             ++i;
         }
         _n = ls.size();
@@ -79,42 +85,39 @@ public:
     constexpr cvector(const cvector & v){
         preserve(v.capacity());
         for (std::size_t i = 0 ; const auto & x : v){
-            new (_start+i) T(x);
+            std::construct_at(_start+i , x); 
             ++i;
         }
         _n = v.size();
     }
 
     constexpr cvector(cvector && v) noexcept{
-        _n = v.size();              v._n = 0;
-        _n_storage = v.capacity();  v._n_storage = 0;
-        _start = v._start;          v._start = nullptr;
+        move_values_from(v);
     }
 
     constexpr ~cvector() noexcept{
-        if(_start){
-            deconstruct_all();
-            this->deallocate(_start ,capacity());
-            _n_storage = _n = 0;
-            _start = nullptr;
-        }
+        if(!_start) return ;
+        deconstruct_all();
+        this->deallocate(_start ,capacity());
+        _n_storage = _n = 0;
+        _start = nullptr;
     }
 
     constexpr cvector& operator = (const cvector & v){
         deconstruct_all();
         preserve(v.capacity());
         for(std::size_t i = 0 ; auto & x : v){
-            new (_start + i) T(x);
+            std::construct_at(_start+i , x); 
             ++i;
         }
         _n = v.size();
+        return *this;
     }
 
     constexpr cvector & operator = (cvector && v) noexcept{
         this->~cvector();
-        _n = v.size();              v._n = 0;
-        _n_storage = v.capacity();  v._n_storage = 0;
-        _start = v._start;          v._start = nullptr;
+        move_values_from(v);
+        return *this;
     }
 
 public:
@@ -133,7 +136,7 @@ public:
     constexpr void push_back(T t){
         if(size() == capacity()) 
             preserve(2 * size());
-        new (_start + size()) T(std::move(t));
+        std::construct_at(_start + size() , std::move(t));
         ++_n;
     }
 
@@ -147,9 +150,19 @@ public:
         return _start[i];
     }
 
+    constexpr bool operator== (const cvector & v) const{
+        if(size() != v.size()) return false;
+        for(std::size_t i = 0 ; auto & x : v){
+            if(_start[i] != x) return false;
+            ++i;
+        }
+        return true;
+    }
+
 private:
 
     constexpr void preserve(std::size_t n){
+        if(n == 0) n = 4;
         if(_start == nullptr) {
             _start = this->allocate(n);
             if(_start == nullptr) throw std::bad_alloc{};
@@ -167,9 +180,14 @@ private:
     }
 
     constexpr void deconstruct_all(){
-        for(auto & x : *this)
-            x.~T();
+        std::destroy_n(begin() , size());
         _n = 0;
+    }
+
+    constexpr void move_values_from(cvector & v){
+        _n = v.size();              v._n = 0;
+        _n_storage = v.capacity();  v._n_storage = 0;
+        _start = v._start;          v._start = nullptr;
     }
 
 private:
@@ -178,3 +196,6 @@ private:
     T * _start{nullptr};
 };
 #endif
+
+};
+

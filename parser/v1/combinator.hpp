@@ -4,13 +4,21 @@
 
 #include "types.hpp"
 
+namespace pscpp{
+
 //a -> parser a
 template<class T>
 constexpr auto result(T && t){
-    return [=](parser_string str) -> parser_result<T>{
+    return [t= std::forward<T>(t)](parser_string str) -> parser_result<T>{
         return std::pair{t , str};
     };
 }
+
+template<class T>
+requires std::is_default_constructible_v<T>
+constexpr auto result_def = [](parser_string str) -> parser_result<T>{
+    return std::pair{T{} , str};
+}; 
 
 //parser a
 template<class T>
@@ -37,10 +45,12 @@ constexpr Parser auto lift(F &&  f){
 }
 
 //parser a -> (a -> parser b) -> parser b
-template<Parser P , Callable F>
+template<Parser P , class F>
 requires std::invocable<F , typename parser_traits<P>::type>
 constexpr Parser auto bind(P && p , F && f){
-    return [=](parser_string str){
+    using PT= std::invoke_result_t<F , typename parser_traits<P>::type>;
+    using T = typename parser_traits<PT>::type;
+    return [=](parser_string str)->parser_result<T>{
         auto r1 = p(str);
         if(!r1) return {};
         else return f(std::move(r1->first))(r1->second);
@@ -61,7 +71,7 @@ constexpr Parser auto plus(T1 && t1 , T2 && t2){
 /// operator >> << >>= | *
 
 //bind operator
-template<Parser P , Callable F>
+template<Parser P , class F>
 constexpr Parser auto operator >>= (P && p , F && f){
     return bind(std::forward<P>(p) , std::forward<F>(f));
 }
@@ -90,35 +100,51 @@ constexpr Parser auto operator << (P1 && p1 , P2 && p2 ){
     });
 }
 
+/// skip
+
 template<Parser P>
 constexpr Parser auto skip(P p){
-    return bind(p , result<none_t>);
+    return p >> result(none_t{});
 }
 
 /// many , sepby , chainl , chainr
 
-// template<ListContainer Container ,Parser P >
-// constexpr Parser auto many1(P && p){
-//     return [=](parser_string str)->parser_result<Container>{
-//         Container c{};
-//         auto result = p(str);
-//         while(result){
-//             auto && [v , remain] = *result;
-//             if constexpr (requires {c.emplace_back();})
-//                 c.emplace_back(std::move(v));
-//             else 
-//                 c.push_back(std::move(v));
-//             result = p(remain);
-//         }
-//         if(c.size() == 0) return {};
-//         else return std::pair{std::move(c),result->second};
-//     };
-// }
+template<Parser P >
+constexpr Parser auto many1(P && p){
+    using T = typename parser_traits<P>::type;
+    if constexpr (std::is_same_v<none_t , std::remove_cvref_t<T>>){
+        return [=](parser_string str)->parser_result<none_t>{
+            auto result = p(str);
+            if(!result) return {};
+            while(result){
+                auto && [_ , remain] = *result;
+                result = p(remain);
+            }
+            return std::pair{none_t{},result->second};
+        };
+    }else{
+        using list_t = cvector<T>;
+        return [=](parser_string str)->parser_result<list_t>{
+            list_t c{};
+            auto result = p(str);
+            while(result){
+                auto && [v , remain] = *result;
+                c.push_back(std::move(v));
+                result = p(remain);
+            }
+            if(c.size() == 0) return {};
+            else return std::pair{std::move(c),result->second};
+        };
+    }
+}
 
-// template<ListContainer Container , Parser P >
-// constexpr Parser auto many(P && p){
-//     return many1<Container>(p) | result(Container{});
-// }
+template<Parser P >
+constexpr Parser auto many(P && p){
+    using T = typename parser_traits<P>::type;
+    if constexpr (std::is_same_v<none_t , std::remove_cvref_t<T>>){
+        return many1(p) | result(none_t{});
+    }else
+        return many1(p) | result_def<cvector<T>>;
+}
 
-
-
+};
