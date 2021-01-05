@@ -4,13 +4,14 @@ CPPSTANDARD := c++20
 OPT := -O3
 LINK:= -ledit
 DEFINE := -DFMT_HEADER_ONLY
-CXXFLAG := $(OPT) $(LINK) -Wall -std=$(CPPSTANDARD) $(DEFINE)
-INCLUDE := ./parser
+INCLUDE := ./include
+CXXFLAG := $(OPT) $(LINK) -Wall -std=$(CPPSTANDARD) $(DEFINE) -I$(INCLUDE)
 
 # main building vars
 TEMP_OBJ_DIR := ./tmp
 TARGET := bin/main
-SRC_FILE := main.cpp
+SRC_DIR := src
+SRC_FILE := $(shell ls $(SRC_DIR)/*.cpp)
 
 # test building vars
 TEST_SRC_DIR := ./test
@@ -23,11 +24,11 @@ release: $(SRC_FILE)
 	$(TARGET)
 
 test : bin $(TEMP_OBJ_DIR) $(TEST_OBJS)
-	$(CXX) $(TEST_OBJS) -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread -lgtest_main 
+	$(CXX) $(TEST_OBJS) -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I$(INCLUDE) -lgtest -lpthread -lgtest_main 
 	./bin/test
 
 $(TEMP_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.cpp $(INCLUDE)/*.h 
-	$(CXX) $< -o $@ -c $(OPT) -Wall -std=$(CPPSTANDARD) -I./ $(TEST_DEF) -fconcepts-diagnostics-depth=10
+	$(CXX) $< -o $@ -c $(OPT) -Wall -std=$(CPPSTANDARD) -I$(INCLUDE) $(TEST_DEF) -fconcepts-diagnostics-depth=10
 
 bin:
 	@mkdir -p bin

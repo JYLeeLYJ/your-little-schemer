@@ -4,11 +4,9 @@
 #include <algorithm>
 #include <stdexcept>
 #include <numeric>
-
-#include "parser/v1/types.hpp"
-#include "parser/v1/parser.hpp"
-
 #include <gtest/gtest.h>
+
+#include "parsec.h"
 
 using namespace std::literals;
 using namespace pscpp;
@@ -101,6 +99,9 @@ TEST(test_v1 , test_char_parser){
     auto s = chars(digit)("114514");
     EXPECT_EQ(s->first , "114514"sv);
     EXPECT_EQ(s->second , ""sv);
+
+    auto eofres = (spaces << eof) ("  1111");
+    EXPECT_FALSE(eofres);
 }
 
 TEST(test_v1 , test_combinator){
@@ -121,7 +122,6 @@ TEST(test_v1 , test_combinator){
     EXPECT_TRUE(fold_res);
     EXPECT_EQ(fold_res->first , 3);
     EXPECT_EQ(fold_res.value().second , "111"sv);
-
 }
 
 constexpr int to_int(std::string_view nums){

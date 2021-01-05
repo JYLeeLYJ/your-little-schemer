@@ -9,6 +9,11 @@
 #include <editline/history.h>
 #include <editline/readline.h>
 
+#include <variant>
+#include <stdexcept>
+#include <numeric>
+#include "parsec.h"
+
 struct repl_io{
     auto operator >> (std::function<std::string(std::string_view)> && f){
         return [f = std::move(f)]{
@@ -17,17 +22,17 @@ struct repl_io{
                 std::string_view input{str_guard.get()};
                 add_history(input.data());
                 if(input == ":q") break;
-                auto result = f(input);
-                fmt::print("{}\n",result);
+                try{
+                    auto result = f(input);
+                    fmt::print("{}\n",result);
+                }catch(const std::exception & e){
+                    fmt::print("{}\n",e.what());
+                }
             }
         };
     }
 };
 
-#include <variant>
-#include <stdexcept>
-#include <numeric>
-#include "parser/parsec.h"
 using namespace pscpp;
 
 constexpr int to_int(std::string_view nums){
@@ -69,13 +74,9 @@ auto sub_expr(parser_string str)->parser_result<int>{
 
 auto polish = (expr | lispy) << eof ;
 
-auto parse_polish (parser_string str)->parser_result<int>{
-    return polish(str);
-}
-
 auto main_loop = repl_io{} >> [](std::string_view input){
 
-    auto result = parse_polish(input);
+    auto result = polish(input);
     if(!result) 
         return fmt::format("invalid input format");
     else 

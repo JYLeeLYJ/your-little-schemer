@@ -19,7 +19,7 @@ constexpr auto result(T && t){
 
 template<class T>
 requires std::is_default_constructible_v<T>
-constexpr auto result_def = [](parser_string str) -> parser_result<T>{
+constexpr auto result_default(parser_string str) -> parser_result<T>{
     return std::pair{T{} , str};
 }; 
 
@@ -144,7 +144,7 @@ constexpr Parser auto many(P && p){
     if constexpr (std::is_same_v<none_t , std::remove_cvref_t<T>>){
         return many1(p) | result(none_t{});
     }else
-        return many1(p) | result_def<cvector<T>>;
+        return many1(p) | result_default<cvector<T>>;
 }
 
 };
