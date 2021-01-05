@@ -20,6 +20,7 @@ TEST_DEF := -DNOTEST_EXPERIMENTAL #-DNOTEST_V1
 
 release: $(SRC_FILE)
 	$(CXX) $(SRC_FILE) -o $(TARGET) $(CXXFLAG)
+	$(TARGET)
 
 test : bin $(TEMP_OBJ_DIR) $(TEST_OBJS)
 	$(CXX) $(TEST_OBJS) -o bin/test $(OPT) -Wall -std=$(CPPSTANDARD) -I./ -lgtest -lpthread -lgtest_main 
