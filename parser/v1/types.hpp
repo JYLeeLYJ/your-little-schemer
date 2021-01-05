@@ -44,17 +44,14 @@ concept Callable = requires(T t){
     typename decltype(std::function{t})::result_type;
 };
 
-template<class Container>
-concept ListContainer = 
-    std::ranges::sized_range<Container> && 
-    requires (Container c){
-        c.push_back(typename Container::value_type{});
-    };
-
 template<Parser P>
 struct parser_traits {
     using type = typename std::invoke_result_t<P,parser_string>::type;
 };
+
+template<Parser ...Ps>
+using product_result_type = std::tuple<typename parser_traits<Ps>::type ...>;
+
 
 struct none_t {};
 
@@ -141,12 +138,10 @@ public:
     }
 
     constexpr T & operator[] (std::size_t i){
-        if(i >= this->size()) throw std::out_of_range{};
         return _start[i];
     }
 
     constexpr const T & operator [](std::size_t i) const{
-        if(i >= this->size()) throw std::out_of_range{};
         return _start[i];
     }
 
