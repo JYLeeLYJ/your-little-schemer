@@ -4,8 +4,7 @@
 
 #include "types.hpp"
 #include "parser_utils.hpp"
-
-#include <iostream>
+#include "constexpr_containers.hpp"
 
 namespace pscpp{
 
@@ -29,16 +28,15 @@ constexpr auto zero(parser_string ) -> parser_result<T> {
     return {};
 }
 
-
 //parser a -> (a -> b) -> parser b
-template<Callable F , Parser ...Ps>
+template<class F , Parser ...Ps>
 requires std::invocable<F , typename parser_traits<Ps>::type ...>
 constexpr auto fmap(F && f , Ps && ...ps) {
     using R = std::invoke_result_t<F , typename parser_traits<Ps>::type ...>;
     return [=](parser_string str) -> parser_result<R> {
         auto res = chain_parse(str , ps ...);
         if(!res) return {};
-        return std::pair{std::apply(f , res->first) , res->second};
+        return std::pair{std::apply(f , std::move(res->first)) , res->second};
     };
 }
 
@@ -118,6 +116,24 @@ constexpr Parser auto skip(P p){
     return p >> result(none_t{});
 }
 
+//parser a -> parser maybe a
+template<Parser P>
+constexpr Parser auto option(P && p){
+    using R = std::optional<typename parser_traits<P>::type>;
+    return [=](parser_string str) -> parser_result<R>{
+        auto res = p(str);
+        if(!res)return std::pair{R{} , str};
+        else    return std::pair{res->first , res->second};
+    };
+}
+
+template<Parser ...Ps>
+constexpr Parser auto andp(Ps && ...ps){
+    return [=](parser_string str){
+        return chain_parse(str , ps...);
+    };
+}
+
 /// many , sepby , chainl , chainr
 
 template<Parser P >
@@ -128,7 +144,7 @@ constexpr Parser auto many1(P && p){
             return foldl_parse(str , p , none_t{} , [](auto && none , auto && _){return none;});
         };
     }else{
-        using list_t = cvector<T>;
+        using list_t = cexpr::vector<T>;
         return [=](parser_string str)->parser_result<list_t>{
             return foldl_parse(str , p , list_t{} , [](list_t && c , T && v ){
                 c.push_back(v);
@@ -144,7 +160,7 @@ constexpr Parser auto many(P && p){
     if constexpr (std::is_same_v<none_t , std::remove_cvref_t<T>>){
         return many1(p) | result(none_t{});
     }else
-        return many1(p) | result_default<cvector<T>>;
+        return many1(p) | result_default<cexpr::vector<T>>;
 }
 
 };

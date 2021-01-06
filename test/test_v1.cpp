@@ -10,54 +10,7 @@
 
 using namespace std::literals;
 using namespace pscpp;
-
-constexpr auto test_const(){
-    int n = 0;
-    cvector v{1,2,3,4};
-    n = v.size();
-    return n;
-}
-
-constexpr auto test_cv(){
-    cvector v{1,2};
-    v.push_back(3);
-    v.push_back(4);
-    return v;
-}
-
-constexpr auto test_cv_copy(){
-    cvector v{1,2};
-    cvector v2{1,2,3,4,5};
-    v = v2;
-
-    return v.capacity();
-}
-
-TEST(test_v1 , test_types){
-
-    static_assert(test_const() == 4);
-    static_assert(test_cv().size() == 4);
-    static_assert(test_cv_copy() == 7);
-
-    cvector<int> v{1,2,3,4};
-    EXPECT_EQ(v.size() , 4);
-    v.push_back(5);
-    for(auto i = 1 ; auto x : v){
-        EXPECT_EQ(x , i);
-        ++i;
-    }
-
-    EXPECT_EQ(v.capacity() , 6);
-    auto v2 = v;
-
-    EXPECT_EQ(v2.size() , v.size());
-    EXPECT_EQ(v2.capacity() , v.capacity());
-    
-    for(auto i = 1 ; auto x : v2){
-        EXPECT_EQ(x , i);
-        ++i;
-    }
-}
+using cexpr::vector;
 
 TEST(test_v1 , test_char_parser){
     auto res1 = item("");
@@ -93,7 +46,7 @@ TEST(test_v1 , test_char_parser){
     EXPECT_TRUE(res7);
 
     auto && [v , rest ] = *res7;
-    auto expect = cvector({'1','2','3','4','5'});
+    auto expect = vector({'1','2','3','4','5'});
     EXPECT_EQ(v , expect);
 
     auto s = chars(digit)("114514");
@@ -122,14 +75,24 @@ TEST(test_v1 , test_combinator){
     EXPECT_TRUE(fold_res);
     EXPECT_EQ(fold_res->first , 3);
     EXPECT_EQ(fold_res.value().second , "111"sv);
+
+    auto option_res = (option('+'_char) >> digit)("123");
+    EXPECT_TRUE(option_res);
+    EXPECT_EQ(option_res->first , '1');
 }
+
+TEST(test_v1 , test_constexpr){
+    static_assert( ("111"_str ("11111")));
+}
+
+namespace {
 
 constexpr int to_int(std::string_view nums){
     auto v = nums | std::ranges::views::transform([](char ch)->int {return ch - '0';}) ;
     return std::accumulate(v.begin() , v.end(), 0 , [](int init , int i ){return init * 10 + i;});
 }
 
-constexpr int eval_lispy(char op , cvector<int> ints){
+constexpr int eval_lispy(char op , vector<int> ints){
     switch (op){
     case '+': return std::accumulate(ints.begin() , ints.end() , 0 , std::plus<int>{});
     case '-': return std::accumulate(ints.begin() , ints.end() , 0 , std::minus<int>{});
@@ -160,6 +123,8 @@ _sub_expr   = '('_char >> lispy << ')'_char;
 auto sub_expr(parser_string str)->parser_result<int>{
     return _sub_expr(str);
 }
+
+};
 
 TEST(test_v1 , test_parse_expr){
 

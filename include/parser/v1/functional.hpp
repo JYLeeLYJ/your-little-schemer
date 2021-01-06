@@ -1,5 +1,5 @@
 #pragma once
-#include<type_traits>
+#include <type_traits>
 #include <experimental/type_traits>
 
 template<template <typename ...> class kind>
@@ -42,3 +42,11 @@ template<typename F>
 constexpr curry_t<F> make_curry(F&& f) {
     return { std::forward<F>(f) };
 }
+
+template<class T>
+struct constructor{
+    explicit constexpr constructor() noexcept = default;
+    template<class ...Ts>
+    requires std::is_constructible_v<T , Ts...>
+    constexpr auto operator() (Ts && ...ts){ return T(std::forward<Ts>(ts)...);}
+};
