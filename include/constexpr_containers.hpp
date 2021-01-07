@@ -4,6 +4,7 @@
 #include <memory>
 #include <new>
 #include <version>
+#include <iostream>
 
 namespace cexpr{
 
@@ -97,6 +98,7 @@ public:
     }
 
     constexpr vector& operator = (const vector & v){
+        if(std::addressof(v) == this) return *this;
         deconstruct_all();
         preserve(v.capacity());
         for(std::size_t i = 0 ; auto & x : v){
@@ -108,7 +110,8 @@ public:
     }
 
     constexpr vector & operator = (vector && v) noexcept{
-        this->~vector();
+        if(std::addressof(v) == this) return *this;
+        deconstruct_all();
         move_values_from(v);
         return *this;
     }
@@ -163,7 +166,7 @@ private:
             T* p = this->allocate(n);
             if(p == nullptr)  throw std::bad_alloc{};
             for(std::size_t i = 0 ; i < size() ; ++ i)
-                p[i] = std::move(_start[i]);
+                std::construct_at(p + i , std::move(_start[i]));
             this->deallocate(_start , _n_storage);
             _n_storage = n;
             _start = p;
@@ -186,5 +189,6 @@ private:
     std::size_t _n_storage{0};
     T * _start{nullptr};
 };
+
 #endif
 };

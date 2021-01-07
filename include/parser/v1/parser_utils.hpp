@@ -1,5 +1,5 @@
 #pragma once
-
+#include <iostream>
 #include "types.hpp"
 
 namespace pscpp{
@@ -22,16 +22,17 @@ constexpr auto chain_parse(parser_string str , P && p ,Ps && ...ps) -> parser_re
 }
 
 template<Parser P , class T , class ACC>
-requires std::invocable<ACC , T , typename parser_traits<P>::type>
-constexpr auto foldl_parse(parser_string str ,P && p , T && t , ACC && acc ) -> parser_result<T>{
+requires std::invocable<ACC , std::add_rvalue_reference_t<std::remove_reference_t<T>> , typename parser_traits<P>::type>
+constexpr auto foldl_parse(parser_string str ,P && p , T && t , ACC && acc ) -> parser_result<std::remove_cvref_t<T>>{
     auto result = p(str);
     if(!result) return {};
     for(;;){
         auto [v , remain] = std::move(*result);
         t = acc(std::move(t) , std::move(v));
         result = p(remain);
-        if(!result)
+        if(!result){
             return std::pair{std::move(t) , remain};
+        }
     };
 }
 

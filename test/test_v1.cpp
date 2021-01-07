@@ -42,6 +42,9 @@ TEST(test_v1 , test_char_parser){
     EXPECT_EQ(res6->first , none_t{});
     EXPECT_EQ(res6->second , "111"sv);
 
+    auto res6_1 = spaces1("11");
+    EXPECT_FALSE(res6_1);
+
     auto res7 = many1(digit)("12345");
     EXPECT_TRUE(res7);
 
@@ -79,10 +82,30 @@ TEST(test_v1 , test_combinator){
     auto option_res = (option('+'_char) >> digit)("123");
     EXPECT_TRUE(option_res);
     EXPECT_EQ(option_res->first , '1');
+
+    auto psep = sepby1(digit , spaces1);
+
+    auto sep_res = psep("1 1 1 ");
+    EXPECT_TRUE(sep_res);
+    EXPECT_EQ(sep_res->first , (cexpr::vector{'1','1','1'}));
+    EXPECT_EQ(sep_res->second, " "sv);
+
+    auto sep2 = psep("a a a");//{}
+    EXPECT_FALSE(sep2); 
+    auto sep3 = sepby(digit , spaces1)("a a a");//vector{}
+    EXPECT_TRUE(sep3); 
+    EXPECT_EQ(sep3->first.size() , 0);
+    auto sep4 = sepby(digit , spaces1)("11 1");//vector{1}
+    EXPECT_TRUE(sep4);
+    EXPECT_EQ(sep4->first.size() , 1);  
+    auto sep5 = sepby(digit , spaces)("11 1");//vector{1,1,1}
+    EXPECT_TRUE(sep5);  
+    EXPECT_EQ(sep5->first.size() , 3);
 }
 
 TEST(test_v1 , test_constexpr){
-    static_assert( ("111"_str ("11111")));
+    static_assert( ("111"_str ("11111")).value().second == "11"sv);
+    // static_assert(many(digit)("1111").value().first.size() == 4);
 }
 
 namespace {

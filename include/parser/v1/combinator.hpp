@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ranges>
-
+#include <iostream>
 #include "types.hpp"
 #include "parser_utils.hpp"
 #include "constexpr_containers.hpp"
@@ -36,7 +36,7 @@ constexpr auto fmap(F && f , Ps && ...ps) {
     return [=](parser_string str) -> parser_result<R> {
         auto res = chain_parse(str , ps ...);
         if(!res) return {};
-        return std::pair{std::apply(f , std::move(res->first)) , res->second};
+        return parser_result<R>{std::apply(f , std::move(res->first)) , res->second};
     };
 }
 
@@ -93,7 +93,7 @@ constexpr Parser auto operator >> (P1 && p1 , P2 && p2 ){
         auto result = chain_parse(str , p1 , p2);
         if(!result) return {};
         auto && [ _ , x] = result->first;
-        return std::pair{std::move(x) , result->second};
+        return parser_result<R>{std::move(x) , result->second};
     };
 }
 
@@ -105,7 +105,7 @@ constexpr Parser auto operator << (P1 && p1 , P2 && p2 ){
         auto result = chain_parse(str , p1 , p2);
         if(!result) return {};
         auto && [ x , _ ] = result->first;
-        return std::pair{std::move(x) , result->second};
+        return parser_result<R>{std::move(x) , result->second};
     };
 }
 
@@ -147,7 +147,7 @@ constexpr Parser auto many1(P && p){
         using list_t = cexpr::vector<T>;
         return [=](parser_string str)->parser_result<list_t>{
             return foldl_parse(str , p , list_t{} , [](list_t && c , T && v ){
-                c.push_back(v);
+                c.push_back(std::move(v));
                 return std::move(c);
             });
         };
@@ -158,9 +158,37 @@ template<Parser P >
 constexpr Parser auto many(P && p){
     using T = typename parser_traits<P>::type;
     if constexpr (std::is_same_v<none_t , std::remove_cvref_t<T>>){
-        return many1(p) | result(none_t{});
+        return many1(std::forward<P>(p)) | result(none_t{});
     }else
-        return many1(p) | result_default<cexpr::vector<T>>;
+        return many1(std::forward<P>(p)) | result_default<cexpr::vector<T>>;
+}
+
+template<Parser P , Parser S>
+constexpr Parser auto sepby1(P && p , S && sep){
+    using R = typename parser_traits<P>::type;
+    using list_t = cexpr::vector<R>;
+    return [=](parser_string str)->parser_result<list_t>{
+        auto result = p(str);
+        if(!result) return {};
+        list_t ls{std::move(result->first)};
+        auto remain = result->second;
+        for(;;){
+            auto sep_res = sep(remain);
+            if(!sep_res) break;
+            result = p(sep_res->second);
+            if(!result) break;
+            remain = result->second;
+            ls.push_back(result->first);
+        }
+        return parser_result<list_t>(std::move(ls) , remain);
+    };
+} 
+
+template<Parser P , Parser S>
+constexpr Parser auto sepby(P && p , S && sep){
+    using T = typename parser_traits<P>::type;
+    using R = cexpr::vector<T>;
+    return sepby1(std::forward<P>(p) , std::forward<S>(sep)) | result_default<R>;
 }
 
 };

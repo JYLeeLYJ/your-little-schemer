@@ -33,12 +33,11 @@ struct repl_io{
 
 auto main_loop = repl_io{} >> [](std::string_view input){
 
-    auto result = parse_polish(input);
+    auto result = parse_lispy(input);
     if(!result) 
         return fmt::format("invalid input format");
     else 
-        return fmt::format(" {} = {}" , input , *result);
-
+        return fmt::format("{}" , eval_lispy(*result));
 };
 
 int main(){

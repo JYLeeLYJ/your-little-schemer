@@ -63,6 +63,14 @@ TEST(test_cexpr , test_types){
     Box b{1};
     EXPECT_TRUE(b);
     EXPECT_EQ(*b , 1);
+
+    v = std::move(v);
+    EXPECT_EQ(v.size() , 5);
+    EXPECT_EQ(v.capacity() , 6);
+
+    vector<int> v3{1};
+    v3.push_back(1);
+    EXPECT_EQ(v3.size() , 2);
 }
 
 // TEST(test_cexpr , test_var){
