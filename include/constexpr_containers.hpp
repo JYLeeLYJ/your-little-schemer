@@ -4,7 +4,6 @@
 #include <memory>
 #include <new>
 #include <version>
-#include <iostream>
 
 namespace cexpr{
 

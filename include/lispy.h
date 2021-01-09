@@ -10,9 +10,10 @@
 std::optional<int> parse_polish(std::string_view str) ;
 
 using Number = int;
-enum class Symbol{  Add = '+',Minus = '-', Mut = '*', Div = '/',};
+enum class Symbol{  Add = '+', Sub = '-', Mut = '*', Div = '/',};
 
 struct Expr;
+using ExprList = cexpr::vector<Expr> ;
 struct SExpr : cexpr::vector<Expr>{
     using super = cexpr::vector<Expr>;
     using super::vector;
@@ -20,8 +21,14 @@ struct SExpr : cexpr::vector<Expr>{
     : super{std::move(v)}{}
 };
 
-struct Expr : std::variant<Number , Symbol , SExpr>{
-    using super = std::variant<Number , Symbol , SExpr>;
+struct Quote{
+    cexpr::vector<Expr> exprs;
+    bool operator == (const Quote & q) const {return exprs == q.exprs;}
+};
+
+using ExprBase = std::variant<Number , Symbol , SExpr , Quote>;
+struct Expr : ExprBase{
+    using super = ExprBase;
     using super::variant;
 
     template<class V>
@@ -49,10 +56,10 @@ struct Expr : std::variant<Number , Symbol , SExpr>{
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-std::optional<SExpr> parse_lispy(std::string_view str);
+std::optional<Expr> parse_lispy(std::string_view);
 
-std::optional<Expr> parse_expr(std::string_view);
+// std::string print_tree(const Expr & );
 
-std::string print_tree(const Expr & e);
+std::string print_expr(const Expr &);
 
-int eval_lispy(const SExpr & e);
+void eval(Expr & );

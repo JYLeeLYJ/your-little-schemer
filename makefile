@@ -20,7 +20,7 @@ TEST_FILES := $(shell ls $(TEST_SRC_DIR)/*.cpp)
 TEST_OBJS:= $(patsubst %.cpp,$(TEMP_OBJ_DIR)/test/%.o,$(notdir $(TEST_FILES)))
 
 release: bin $(TEMP_OBJ_DIR) $(OBJS) main.cpp
-	$(CXX) $(OBJS) main.cpp -o $(TARGET) $(CXXFLAG)  $(LINK)
+	$(CXX) $(OBJS) main.cpp -o $(TARGET) $(CXXFLAG) $(LINK)
 	$(TARGET)
 
 $(TEMP_OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp $(INCLUDE)/*.h
