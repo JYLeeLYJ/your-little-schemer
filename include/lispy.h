@@ -14,16 +14,14 @@ enum class Symbol{  Add = '+', Sub = '-', Mut = '*', Div = '/',};
 
 struct Expr;
 using ExprList = cexpr::vector<Expr> ;
-struct SExpr : cexpr::vector<Expr>{
-    using super = cexpr::vector<Expr>;
-    using super::vector;
-    constexpr SExpr(cexpr::vector<Expr> && v) noexcept 
-    : super{std::move(v)}{}
+struct SExpr{
+    ExprList exprs;
+    bool operator == (const SExpr & q) const = default;
 };
 
 struct Quote{
-    cexpr::vector<Expr> exprs;
-    bool operator == (const Quote & q) const {return exprs == q.exprs;}
+    ExprList exprs;
+    bool operator == (const Quote & q) const = default;
 };
 
 using ExprBase = std::variant<Number , Symbol , SExpr , Quote>;

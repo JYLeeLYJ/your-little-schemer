@@ -15,8 +15,7 @@ using namespace pscpp;
 namespace {
 
 Expr to_number(std::optional<char> op, std::string_view nums){
-    auto v = nums | std::ranges::views::transform([](char ch)->int {return ch - '0';}) ;
-    int n = std::accumulate(v.begin() , v.end(), 0 , [](int init , int i ){return init * 10 + i;});
+    int n = std::accumulate(nums.begin() , nums.end(), 0 , [](int init , char i ){return init * 10 + ( i - '0');});
     return Number{op ? -n : n};
 }
 
@@ -24,11 +23,11 @@ Expr to_sym(char c){
     return static_cast<Symbol>(c);
 }
 
-Expr to_sexpr(SExpr && e){
-    return std::move(e);
+Expr to_sexpr(ExprList && e){
+    return SExpr{std::move(e)};
 }
 
-Expr to_quote(cexpr::vector<Expr> && q){
+Expr to_quote(ExprList && q){
     return Quote{std::move(q)};
 }
 
@@ -63,7 +62,7 @@ std::optional<Expr> parse_lispy(std::string_view str){
     
     auto & expr_list = result.value().first;
     if(expr_list.size() == 1) return std::move(expr_list[0]);
-    else return SExpr(std::move(expr_list));
+    else return SExpr{std::move(expr_list)};
 }
 
 std::optional<Expr> parse_expr(std::string_view str){
@@ -89,7 +88,8 @@ struct fmt::formatter<Quote> : default_format_parser{
 template<>
 struct fmt::formatter<SExpr> : default_format_parser{
     template<class Context>
-    auto format(const SExpr & s , Context & ctx){
+    auto format(const SExpr & sexpr , Context & ctx){
+        auto & [s] = sexpr;
         return format_to(ctx.out() , "({})" , fmt::join(s.begin(), s.end() , " "));
     }
 };
@@ -120,9 +120,10 @@ std::string print_expr(const Expr & e){
     return fmt::format("{}" , e);
 }
 
-Expr eval_sexpr(SExpr & s){
+Expr eval_sexpr(SExpr & sexpr){
+    auto & [s] = sexpr;
     if(s.size() == 0 || std::holds_alternative<Symbol>(s[0]) == false) 
-        return std::move(s);
+        return std::move(sexpr);
 
     if(s.size() == 1) 
         return std::move(s[0]);

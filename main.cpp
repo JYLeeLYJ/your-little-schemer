@@ -12,7 +12,7 @@
 
 void put_version_info(){
     fmt::print("\n");
-    fmt::print("Lispy Version 0.0.0.0.1\n");
+    fmt::print("Lispy Version 0.0.2\n");
     fmt::print("Press Ctrl+c to Exit\n\n");
 }
 
@@ -42,7 +42,7 @@ auto main_loop = repl_io{} >> [](std::string_view input){
 
     auto result = parse_lispy(input);
     if(!result) 
-        return fmt::format("invalid input format");
+        return fmt::format("ParseError : invalid input format.");
 
     eval(*result);
     return print_expr(*result);

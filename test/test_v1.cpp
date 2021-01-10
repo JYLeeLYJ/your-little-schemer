@@ -111,8 +111,8 @@ TEST(test_v1 , test_constexpr){
 namespace {
 
 constexpr int to_int(std::string_view nums){
-    auto v = nums | std::ranges::views::transform([](char ch)->int {return ch - '0';}) ;
-    return std::accumulate(v.begin() , v.end(), 0 , [](int init , int i ){return init * 10 + i;});
+    return std::accumulate(nums.begin() , nums.end(), 0 , 
+        [](int init , char i ){return init * 10 + ( i - '0');});
 }
 
 constexpr int eval_lispy(char op , vector<int> ints){
