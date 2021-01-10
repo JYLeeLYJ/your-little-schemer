@@ -1,11 +1,7 @@
 #include <variant>
-#include <string_view>
 #include <optional>
 #include <numeric>
 #include <stdexcept>
-#include <iterator>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
 
 #include "parsec.h"
 #include "lispy.h"
@@ -69,90 +65,4 @@ std::optional<Expr> parse_expr(std::string_view str){
     auto result = expr(str);
     if(result) return result.value().first;
     else return {};
-}
-
-struct default_format_parser{
-    constexpr auto parse(fmt::format_parse_context & ctx){
-        auto it = ctx.begin() , end = ctx.end();
-        if (it != end && *it != '}')  throw fmt::format_error("invalid format");
-        return it;
-    }
-};
-template<>
-struct fmt::formatter<Quote> : default_format_parser{
-    template<class Context >
-    auto format(const Quote & q , Context & ctx){
-        return format_to(ctx.out() , "quote({})" , fmt::join(q.exprs.begin(), q.exprs.end() , " "));
-    }
-};
-template<>
-struct fmt::formatter<SExpr> : default_format_parser{
-    template<class Context>
-    auto format(const SExpr & sexpr , Context & ctx){
-        auto & [s] = sexpr;
-        return format_to(ctx.out() , "({})" , fmt::join(s.begin(), s.end() , " "));
-    }
-};
-template<>
-struct fmt::formatter<Symbol> : default_format_parser{
-    template<class Context>
-    auto format(Symbol s , Context & ctx){
-        return format_to(ctx.out() , "{}" , static_cast<char>(s));
-    }
-};
-
-template<>
-struct fmt::formatter<Expr> : default_format_parser{
-    template<class Context>
-    auto format (const Expr & s , Context & ctx){
-        using RetIt = decltype(ctx.out());
-        return s.match<RetIt>([&](auto && e) mutable{
-            return format_to(ctx.out() , "{}" , e);
-        });
-    }  
-};
-
-// std::string print_tree(const Expr & e){
-//     return "not yet complete.";
-// }
-
-std::string print_expr(const Expr & e){
-    return fmt::format("{}" , e);
-}
-
-Expr eval_sexpr(SExpr & sexpr){
-    auto & [s] = sexpr;
-    if(s.size() == 0 || std::holds_alternative<Symbol>(s[0]) == false) 
-        return std::move(sexpr);
-
-    if(s.size() == 1) 
-        return std::move(s[0]);
-
-    for(auto & e : s) 
-        eval(e);
-
-    // all parameters should be number type
-    auto cond = std::all_of(s.begin() + 1, s.end() , [](const Expr & e ){ return std::holds_alternative<Number>(e);} );
-    if(cond == false ) 
-        throw std::invalid_argument{"all parameter for symbol should be number."};
-    if(s.size() > 3) 
-        throw std::invalid_argument{"too much parameter for operator +-*/. "};
-
-    auto lhs  = std::get<Number>(s[1]) ,  rhs = std::get<Number>(s[2]);
-    switch (std::get<Symbol>(s[0])){  
-    case Symbol::Add : return Number{ lhs + rhs };
-    case Symbol::Sub : return Number{ lhs - rhs };
-    case Symbol::Mut : return Number{ lhs * rhs };
-    case Symbol::Div : 
-        if(rhs == 0) throw std::domain_error{"divied 0 error."};
-        return Number{ lhs / rhs };
-    };
-    return 0; // unreach
-}
-
-void eval(Expr & e){
-    e.match(overloaded{
-        [&] (SExpr & s) { e = eval_sexpr(s);},
-        []  (auto && _) { /*donothing */ },
-    });
 }
