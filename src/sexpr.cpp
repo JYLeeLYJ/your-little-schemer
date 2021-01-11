@@ -15,8 +15,8 @@ Expr to_number(std::optional<char> op, std::string_view nums){
     return Number{op ? -n : n};
 }
 
-Expr to_sym(char c){ 
-    return static_cast<Symbol>(c);
+Expr to_sym(std::string_view s){ 
+    return Symbol{s};
 }
 
 Expr to_sexpr(ExprList && e){
@@ -29,7 +29,7 @@ Expr to_quote(ExprList && q){
 
 /*                                                     \
     number : /-?[0-9]+/ ;                              \
-    symbol : '+' | '-' | '*' | '/' ;                   \
+    symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;        \
     sexpr  : '(' <expr>* ')' ;                         \
     qexpr  : '{' <expr>* '}' ;                         \
     expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
@@ -39,7 +39,7 @@ Expr to_quote(ExprList && q){
 auto _expr(std::string_view str) -> parser_result<Expr> ;
 
 auto numbers    = fmap(to_number    , option('-'_char)  , chars(digit));
-auto symbol     = fmap(to_sym       , one_of("+-*/"));
+auto symbol     = fmap(to_sym       , chars(letter | digit | one_of("_+-*/\\=<>!&")));
 auto expr_ls    = spaces >> sepby(_expr , spaces1) << spaces ;
 auto sexpr      = fmap(to_sexpr     , '('_char >> expr_ls << ')'_char) ;
 auto quote      = fmap(to_quote     , '{'_char >> expr_ls << '}'_char) ;
@@ -49,7 +49,7 @@ auto lispy      = expr_ls << eof ;
 auto _expr(std::string_view str) -> parser_result<Expr> {
     return expr(str);
 }
- 
+
 }
 
 std::optional<Expr> parse_lispy(std::string_view str){

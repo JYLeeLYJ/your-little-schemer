@@ -7,7 +7,7 @@ constexpr auto default_visitor = [](auto && _){};
 using cexpr::vector;
 
 TEST(test_lispy , test_types){
-    Symbol s = Symbol::Div;
+    Symbol s = Symbol{"+"};
     Number n {1};
     const SExpr sexpr{ExprList{s,n}};
 
@@ -24,10 +24,10 @@ TEST(test_lispy , test_types){
         default_visitor,       
     });
 
-    vector<Expr> ve{Symbol::Div};
+    vector<Expr> ve{Symbol{"-"}};
     EXPECT_EQ(ve.size() , 1);
     EXPECT_EQ(ve.capacity() , 1);
-    ve.push_back(Symbol::Div); 
+    ve.push_back(Symbol{"-"}); 
 
     EXPECT_EQ(ve.capacity() , 2);
 }
@@ -44,19 +44,23 @@ TEST(test_lispy , test_sexpr2){
     ASSERT_TRUE(e && std::holds_alternative<SExpr> (e->var()));
 
     EXPECT_EQ( *n  , Expr{-123});
-    EXPECT_EQ( *s  , Expr{Symbol::Div});
+    EXPECT_EQ( *s  , Expr{Symbol{"/"}});
 
     //sexpr should be {Add , 1 , 2}
     const auto & [sexpr] = std::get<SExpr>(e->var());
     EXPECT_EQ(sexpr.size() , 3);
     EXPECT_FALSE(sexpr[0].valueless_by_exception());
-    EXPECT_EQ(sexpr[0].var() , Expr{Symbol::Add});
+    EXPECT_EQ(sexpr[0].var() , Expr{Symbol{"+"}});
     EXPECT_TRUE(std::holds_alternative<Symbol>(sexpr[0]));
     EXPECT_TRUE(std::holds_alternative<Number>(sexpr[1]));
     EXPECT_TRUE(std::holds_alternative<Number>(sexpr[2]));
 
     auto e2 = parse_expr("(+1 2)");
-    EXPECT_FALSE(e2);
+    EXPECT_TRUE(e2 && std::holds_alternative<SExpr>(*e2));
+    
+    auto & [sexpr2] = std::get<SExpr>(*e2);
+    EXPECT_EQ(sexpr2.size() , 2);
+    EXPECT_TRUE(std::holds_alternative<Symbol>(sexpr2[0]));
 }
  
 TEST(test_lispy , test_sexpr3){

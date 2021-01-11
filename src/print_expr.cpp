@@ -29,7 +29,15 @@ template<>
 struct fmt::formatter<Symbol> : default_format_parser{
     template<class Context>
     auto format(Symbol s , Context & ctx){
-        return format_to(ctx.out() , "{}" , static_cast<char>(s));
+        return format_to(ctx.out() , "{}" , s.identifier);
+    }
+};
+
+template<>
+struct fmt::formatter<Function> : default_format_parser{
+    template<class Context>
+    auto format(Function f , Context & ctx){
+        return format_to(ctx.out() , "{}" , f.name);
     }
 };
 

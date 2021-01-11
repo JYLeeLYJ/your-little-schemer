@@ -47,7 +47,8 @@ constexpr Parser auto chars(P && p){
     return [=](parser_string str) -> parser_result<std::string_view>{
         auto res = foldl_parse(str , p , 0 , [](int i , char c){return i+1;});
         if(!res) return {};
-        return std::pair{str.substr(0,res->first) , res->second};
+        auto & [len , state] = *res;
+        return std::pair{str.substr(0,len) , state};
     };
 }
 

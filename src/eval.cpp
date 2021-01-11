@@ -1,39 +1,103 @@
+#include <unordered_map>
+#include <string>
+#include <ranges>
+#include <iterator>
+#include <functional>
 
+#include <fmt/format.h>
 #include "lispy.h"
 
-Expr eval_sexpr(SExpr & sexpr){
-    auto & [s] = sexpr;
-    if(s.size() == 0 || std::holds_alternative<Symbol>(s[0]) == false) 
-        return std::move(sexpr);
+struct ExprListView {
+    ExprList::const_iterator _beg , _end;
+    
+    auto begin()const   {return _beg;}
+    auto end()  const   {return _end;}
 
-    if(s.size() == 1) 
-        return std::move(s[0]);
+    bool empty() const  {return _end == _beg;}
+    auto size() const   {return _end - _beg;}
+};
 
-    for(auto & e : s) 
-        eval(e);
+struct Enviroment;
+using LispyFunction = std::function<Expr (Enviroment &, ExprListView)>;
+using Closure = std::unordered_map<std::string , LispyFunction>;
 
-    // all parameters should be number type
-    auto cond = std::all_of(s.begin() + 1, s.end() , [](const Expr & e ){ return std::holds_alternative<Number>(e);} );
-    if(cond == false ) 
-        throw std::invalid_argument{"all parameter for symbol should be number."};
-    if(s.size() > 3) 
-        throw std::invalid_argument{"too much parameter for operator +-*/. "};
+struct Enviroment{
+    Closure closure;
 
-    auto lhs  = std::get<Number>(s[1]) ,  rhs = std::get<Number>(s[2]);
-    switch (std::get<Symbol>(s[0])){  
-    case Symbol::Add : return Number{ lhs + rhs };
-    case Symbol::Sub : return Number{ lhs - rhs };
-    case Symbol::Mut : return Number{ lhs * rhs };
-    case Symbol::Div : 
-        if(rhs == 0) throw std::domain_error{"divied 0 error."};
-        return Number{ lhs / rhs };
-    };
-    return 0; // unreach
+    explicit Enviroment () ;
+
+    bool contains_symbol(std::string_view name) {
+        return closure.contains(std::string{name});
+    }
+    LispyFunction & get_function(std::string_view name) {
+        return closure.at(std::string{name});
+    }
+    void add_function(std::string_view name , LispyFunction && f) {
+        closure.insert_or_assign(std::string{name} , std::move(f));
+    }
+};
+
+static Enviroment env{};
+
+template<class T , class V>
+concept same_v_as = std::is_same_v<std::decay_t<T> , std::decay_t<V>>;
+
+Expr eval_sepxr(SExpr & sexpr) {
+    auto && [s] = sexpr;
+    for(auto & e : s) eval(e);
+
+    if(s.size() == 0) return std::move(sexpr);
+    if(s.size() == 1) return std::move(s[0]);
+
+    auto & head = s[0];
+    if(std::holds_alternative<Function>(head)){
+        auto & fn = env.get_function(std::get_if<Function>(&head)->name);
+        return fn(env , ExprListView{s.begin() + 1 ,s.end()});
+    }else 
+        throw std::domain_error{"first element is not a function"};
 }
 
 void eval(Expr & e){
     e.match(overloaded{
-        [&] (SExpr & s) { e = eval_sexpr(s);},
-        []  (auto && _) { /*donothing */ },
+        [&](Symbol s)       {
+            if(env.contains_symbol(s.identifier)) e = Function{s.identifier};
+            else throw std::invalid_argument{"unknown symbol."};
+        },
+        [&](SExpr & sexpr)  { e = eval_sepxr(sexpr);},
+        [] (auto && _) { /* do nothing*/}
     });
+}
+
+// add builtins 
+
+inline void check_param_nums(int sz , ExprListView & view){
+    if(view.size() != sz) 
+        throw std::invalid_argument{fmt::format("incorrect parameter number , expect {}" , sz)};
+}
+
+template<class T>
+inline void check_param_types(ExprListView & view){
+    for(auto & e : view){
+        if(!std::holds_alternative<T>(e))
+            throw std::domain_error{"parameters of operator should all be Number."};
+    }
+}
+
+template<class BinOp>
+requires 
+    std::is_default_constructible_v<BinOp>  && 
+    requires (BinOp b){ {b( 1 , 2)} -> std::integral ; }
+Expr builtin_bin_op(Enviroment & _ , ExprListView view) {
+    check_param_nums (2 , view);
+    check_param_types<Number>(view);
+
+    auto it = view.begin();
+    return BinOp{}(std::get<Number>(*it)  , std::get<Number>(*(it+1)));
+}
+
+Enviroment::Enviroment() {
+    add_function("+" , builtin_bin_op<std::plus<Number>>);
+    add_function("-" , builtin_bin_op<std::minus<Number>>);
+    add_function("*" , builtin_bin_op<std::multiplies<Number>>);
+    add_function("/" , builtin_bin_op<std::divides<Number>>);
 }

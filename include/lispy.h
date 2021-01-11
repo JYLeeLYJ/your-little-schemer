@@ -10,21 +10,32 @@
 std::optional<int> parse_polish(std::string_view str) ;
 
 using Number = int;
-enum class Symbol{  Add = '+', Sub = '-', Mut = '*', Div = '/',};
+
+struct Symbol {
+    std::string_view identifier;
+    constexpr bool operator == (const Symbol & s) const = default;
+};
+
+struct Function{
+    std::string_view name;
+    constexpr bool operator == (const Function & s) const = default;
+};
+
+struct Variable{};
 
 struct Expr;
 using ExprList = cexpr::vector<Expr> ;
 struct SExpr{
     ExprList exprs;
-    bool operator == (const SExpr & q) const = default;
+    constexpr bool operator == (const SExpr & q) const = default;
 };
 
 struct Quote{
     ExprList exprs;
-    bool operator == (const Quote & q) const = default;
+    constexpr bool operator == (const Quote & q) const = default;
 };
 
-using ExprBase = std::variant<Number , Symbol , SExpr , Quote>;
+using ExprBase = std::variant<Number , Symbol , SExpr , Quote ,Function>;
 struct Expr : ExprBase{
     using super = ExprBase;
     using super::variant;
@@ -55,8 +66,6 @@ template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::optional<Expr> parse_lispy(std::string_view);
-
-// std::string print_tree(const Expr & );
 
 std::string print_expr(const Expr &);
 
