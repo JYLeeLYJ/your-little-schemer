@@ -7,6 +7,7 @@
 #include "lispy.h"
 
 using namespace pscpp;
+using namespace lispy;
 
 namespace {
 
@@ -44,7 +45,7 @@ auto expr_ls    = spaces >> sepby(_expr , spaces1) << spaces ;
 auto sexpr      = fmap(to_sexpr     , '('_char >> expr_ls << ')'_char) ;
 auto quote      = fmap(to_quote     , '{'_char >> expr_ls << '}'_char) ;
 auto expr       = numbers | symbol | sexpr | quote ;// ;
-auto lispy      = expr_ls << eof ; 
+auto lispy_     = expr_ls << eof ; 
 
 auto _expr(std::string_view str) -> parser_result<Expr> {
     return expr(str);
@@ -52,13 +53,19 @@ auto _expr(std::string_view str) -> parser_result<Expr> {
 
 }
 
+namespace lispy{
+
 std::optional<Expr> parse_lispy(std::string_view str){
-    auto result = lispy(str);
+    auto result = lispy_(str);
     if(!result)  return {};
     
     auto & expr_list = result.value().first;
-    if(expr_list.size() == 1) return std::move(expr_list[0]);
-    else return SExpr{std::move(expr_list)};
+    if(expr_list.size() == 1 && !std::holds_alternative<Symbol>(expr_list[0]))
+        return std::move(expr_list[0]);
+    else 
+        return SExpr{std::move(expr_list)};
+}
+
 }
 
 std::optional<Expr> parse_expr(std::string_view str){

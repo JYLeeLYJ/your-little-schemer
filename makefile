@@ -1,11 +1,11 @@
 # compiling vars
-CXX := g++
+CXX := clang++
 CPPSTANDARD := c++20
 OPT := -O3
 LINK:= -ledit
 DEFINE := -DFMT_HEADER_ONLY
 INCLUDE := ./include
-CXXFLAG := $(OPT) -Wall -std=$(CPPSTANDARD) $(DEFINE) -I$(INCLUDE) -fconcepts-diagnostics-depth=10
+CXXFLAG := $(OPT) -Wall -std=$(CPPSTANDARD) $(DEFINE) -I$(INCLUDE) #-fconcepts-diagnostics-depth=10
 
 # main building vars
 TEMP_OBJ_DIR := ./tmp

@@ -38,15 +38,7 @@ struct repl_io{
     }
 };
 
-auto main_loop = repl_io{} >> [](std::string_view input){
-
-    auto result = parse_lispy(input);
-    if(!result) 
-        return fmt::format("ParseError : invalid input format.");
-
-    eval(*result);
-    return print_expr(*result);
-};
+auto main_loop = repl_io{} >> lispy::eval ;
 
 int main(){
     main_loop();

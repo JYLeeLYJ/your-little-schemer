@@ -7,6 +7,9 @@
 
 #include "constexpr_containers.hpp"
 
+namespace lispy{
+
+
 std::optional<int> parse_polish(std::string_view str) ;
 
 using Number = int;
@@ -37,8 +40,7 @@ struct Quote{
 
 using ExprBase = std::variant<Number , Symbol , SExpr , Quote ,Function>;
 struct Expr : ExprBase{
-    using super = ExprBase;
-    using super::variant;
+    using ExprBase::variant;
 
     template<class V>
     constexpr auto match(V && vis) const { 
@@ -57,8 +59,18 @@ struct Expr : ExprBase{
         return std::visit<R>(std::forward<V>(vis) , var());
     }
 
-    constexpr super & var(){return *this;}
-    constexpr const super & var() const {return *this;}
+    template<class T>
+    constexpr bool holds() const {
+        return std::holds_alternative<T>(*this);
+    }
+
+    template<class T>
+    constexpr decltype(auto) get() {
+        return std::get<T>(var());
+    }
+
+    constexpr ExprBase & var(){return *this;}
+    constexpr const ExprBase & var() const {return *this;}
     constexpr bool operator== (const Expr & rhs){ return var() == rhs.var();}
 };
 
@@ -69,4 +81,8 @@ std::optional<Expr> parse_lispy(std::string_view);
 
 std::string print_expr(const Expr &);
 
-void eval(Expr & );
+void eval_expr(Expr & );
+
+std::string eval(std::string_view);
+
+}

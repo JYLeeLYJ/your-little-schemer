@@ -63,9 +63,7 @@ private:
 template<class T>
 class vector : private std::allocator<T>{
 public:
-    constexpr vector() {
-        preserve(4);
-    }
+    constexpr vector()  = default;
     constexpr vector(const std::initializer_list<T> & ls) {
         preserve(1.5 * ls.size());
         for (std::size_t i = 0 ; const auto & x : ls){
@@ -98,7 +96,7 @@ public:
 
     constexpr vector& operator = (const vector & v){
         if(std::addressof(v) == this) return *this;
-        deconstruct_all();
+        if(_start )deconstruct_all();
         preserve(v.capacity());
         for(std::size_t i = 0 ; auto & x : v){
             std::construct_at(_start+i , x); 
@@ -110,7 +108,7 @@ public:
 
     constexpr vector & operator = (vector && v) noexcept{
         if(std::addressof(v) == this) return *this;
-        deconstruct_all();
+        if(_start)deconstruct_all();
         move_values_from(v);
         return *this;
     }
@@ -130,9 +128,17 @@ public:
 
     constexpr void push_back(T t){
         if(size() == capacity()) 
-            preserve(2 * size());
+            preserve( size() ? 2 * size() : 4 ) ;
         std::construct_at(_start + size() , std::move(t));
         ++_n;
+    }
+
+    template<class ...TArgs>
+    requires std::constructible_from<T , TArgs...>
+    constexpr void emplace_back(TArgs && ...args) {
+        if(size() == capacity()) preserve(2* size()) ;
+        std::construct_at(_start+size() , std::forward<TArgs>(args)...);
+        ++ _n ;
     }
 
     constexpr T & operator[] (std::size_t i){
@@ -155,7 +161,7 @@ public:
 private:
 
     constexpr void preserve(std::size_t n){
-        if(n == 0) n = 4;
+        if(n == 0 ) return ;   // do nothing
         if(_start == nullptr) {
             _start = this->allocate(n);
             if(_start == nullptr) throw std::bad_alloc{};

@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "lispy.h"
+#include "runtime.h"
+
+using namespace lispy;
 
 constexpr auto default_visitor = [](auto && _){};
 
@@ -80,9 +83,28 @@ TEST(test_lispy , test_eval){
     auto expr1 = parse_lispy("+ (+ 1 (* 7 5)) 3").value();
     auto expr2 = parse_lispy("(- 1 100)").value();
 
-    eval(expr1); 
-    eval(expr2);
+    eval_expr(expr1); 
+    eval_expr(expr2);
 
     EXPECT_EQ(std::get<Number>(expr1) , 39);
     EXPECT_EQ(std::get<Number>(expr2) , -99);
+}
+
+TEST(test_lispy , test_builtin){
+    
+    EXPECT_EQ(eval("defvar {x} 100") , "()");
+    EXPECT_EQ(eval("defvar {y} 200") , "()");
+
+    // EXPECT_TRUE(Runtime::environment().contains_symbol("x"));
+    // EXPECT_TRUE(Runtime::environment().contains_symbol("y"));
+
+    auto e_x = parse_lispy("x").value();
+    ASSERT_TRUE(std::holds_alternative<SExpr>(e_x));
+    eval_expr(e_x);
+    EXPECT_TRUE(std::holds_alternative<Number>(e_x));
+
+    EXPECT_EQ(eval("x") , "100");
+    EXPECT_EQ(eval("y") , "200");
+
+    EXPECT_EQ(eval("+ x y") , "300");
 }

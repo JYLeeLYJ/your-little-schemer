@@ -34,8 +34,7 @@ constexpr bool test_box_const(){
     return *b == 1;
 }
 
-TEST(test_cexpr , test_types){
-
+TEST(test_cexpr , test_vector){
     static_assert(test_const() == 4);
     static_assert(test_cv().size() == 4);
     static_assert(test_cv_copy() == 7);
@@ -44,6 +43,7 @@ TEST(test_cexpr , test_types){
     vector<int> v{1,2,3,4};
     EXPECT_EQ(v.size() , 4);
     v.push_back(5);
+    v.emplace_back(6);
     for(auto i = 1 ; auto x : v){
         EXPECT_EQ(x , i);
         ++i;
@@ -60,18 +60,25 @@ TEST(test_cexpr , test_types){
         ++i;
     }
 
-    Box b{1};
-    EXPECT_TRUE(b);
-    EXPECT_EQ(*b , 1);
-
     v = std::move(v);
-    EXPECT_EQ(v.size() , 5);
+    EXPECT_EQ(v.size() , 6);
     EXPECT_EQ(v.capacity() , 6);
 
     vector<int> v3{1};
     v3.push_back(1);
     EXPECT_EQ(v3.size() , 2);
+
+    vector<int> v4{};
+
+    auto v5 = v4;
+    EXPECT_EQ(v5.size() , 0);
+    EXPECT_EQ(v4.capacity() , v5.capacity());
+    EXPECT_EQ(v4.capacity() , 0);
+    EXPECT_EQ(v5.begin() , nullptr);
 }
 
-// TEST(test_cexpr , test_var){
-// }
+TEST(test_cexpr , test_box){
+    Box b{1};   
+    EXPECT_TRUE(b);
+    EXPECT_EQ(*b , 1);
+}

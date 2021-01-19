@@ -3,6 +3,8 @@
 
 #include "lispy.h"
 
+using namespace lispy;
+
 struct default_format_parser{
     constexpr auto parse(fmt::format_parse_context & ctx){
         auto it = ctx.begin() , end = ctx.end();
@@ -52,6 +54,10 @@ struct fmt::formatter<Expr> : default_format_parser{
     }  
 };
 
+namespace lispy {
+
 std::string print_expr(const Expr & e){
     return fmt::format("{}" , e);
+}
+
 }
