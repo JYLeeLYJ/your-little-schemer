@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 #include <typeinfo>
 #include <ranges>
+#include <string>
 
 #include "runtime.h"
 
@@ -10,131 +11,98 @@ using namespace lispy;
 
 namespace{
 
+using ExprListView = cexpr::vector<ast::SExpr> ;
+
 template<class T> 
 const char * name () {
-    if constexpr (std::is_same_v<T , SExpr>) 
+    if constexpr (std::is_same_v<T , ast::SExpr>) 
         return "SExpr" ;
-    else if constexpr (std::is_same_v<T , Number>) 
-        return "Number";
-    else if constexpr (std::is_same_v<T , Symbol>)
-        return "Symbol";
-    else if constexpr (std::is_same_v<T , Quote>)
+    else if constexpr (std::is_same_v<T , ast::Atom>)
+        return "Atom";
+    else if constexpr (std::is_same_v<T , ast::Quote>)
         return "Quote";
-    else if constexpr (std::is_same_v<T , Function>)
-        return "Function";
+    else if constexpr (std::is_same_v<T , ast::Lambda>)
+        return "Procedure";
     else 
-        typeid(T).name();
+        return typeid(T).name();
 }
 
-inline void check_param_nums(int sz , const ExprListView & view){
-    if(view.size() != sz) 
-        throw std::invalid_argument{fmt::format("incorrect parameter number , expect {}" , sz)};
-}
-
-template<std::ranges::range R>
-inline void check_param_no_empty(R & range) {
-    if(range.empty())
-        throw std::invalid_argument{"sexpr cannot be empty."};
+void check_size(std::size_t sz , const ast::List & view){
+    if(view->size() != sz) 
+        throw runtime_error{fmt::format(
+            "incorrect parameter number , got {} params , expect {} , \nin : {}" ,
+             view->size() - 1, sz -1 , ast::print_sexpr(ast::SExpr{view}))};
 }
 
 template<class T>
-inline void check_expr_type(const Expr & e) {
+void check_expr_type(const ast::SExpr & e) {
     if(!e.holds<T>())
-        throw std::domain_error{
-            fmt::format("{} should have type {}" , print_expr(e) , name<T>())};
+        throw type_error{fmt::format(
+            "{} should have type {} , but got {}" , 
+            ast::print_sexpr(e) , name<T>() , name<std::remove_cvref_t<decltype(e)>>())};
 }
 
-template<class T>
-inline void check_param_types(const ExprListView & view){
-    for(auto & e : view)
-        check_expr_type<T>(e);
-}
-
-template<class BinOp>
-requires 
-    std::is_default_constructible_v<BinOp>  && 
-    requires (BinOp b){ {b( 1 , 2)} -> std::integral ; }
-Expr builtin_bin_op(Environment & _ , ExprListView view) {
-    check_param_nums (2 , view);
-    check_param_types<Number>(view);
-
-    auto it = view.begin();
-    return BinOp{}(std::get<Number>(*it)  , std::get<Number>(*(it+1)));
-}
-
-Expr builtin_list(Environment & _ , ExprListView view) {
-    check_param_nums(0 , view);
-    return Quote{};
-}
-
-Expr builtin_head(Environment & _ , ExprListView view) {
-    check_param_nums(1 , view);
-    check_param_types<Quote>(view);
-    auto & [q] = std::get<Quote>(*view.begin());
-    check_param_no_empty(q);
-    return q[0];
-}
-
-Expr builtin_tail(Environment & _  ,ExprListView view) {
-    check_param_nums(1 , view);
-    check_param_types<Quote>(view);
-    auto & [q] = std::get<Quote>(*view.begin());
-    check_param_no_empty(q);
-    return q[q.size() -1];
-}
-
-Expr builtin_eval(Environment & _ , ExprListView view){
-    check_param_nums(1 , view);
-    check_param_types<Quote>(view);
-
-    Expr sexpr = SExpr{std::get<Quote>(*view.begin()).exprs};
-    eval_expr(sexpr);
-    return sexpr;
-}
-
-Expr builtin_defvar(Environment & env , ExprListView view){
-    check_param_nums(2 , view);
-
-    auto & head = *view.begin();
-    auto & var = *(view.begin() + 1);
-
-    //head must be a symbol
-    check_expr_type<Quote>(head);
-    auto & [q] = std::get<Quote>(head);
-    check_param_nums(1 , ExprListView{q.begin() , q.end()});
-    check_expr_type<Symbol>(*q.begin());
-    auto & symbol = std::get<Symbol>(*q.begin()).identifier ;
+ast::SExpr builtin_car(Closure & cls , ast::List & list){
+    check_size(2 ,list.ref());
+    check_expr_type<ast::Quote>(list.ref()[1]);
     
-    env.add_variable(symbol , var);
-    return SExpr{};
-}
+    auto & q = list.ref()[1].get_if<ast::Quote>()->ref();
 
-Expr builtin_join(Environment & _ , ExprListView view){
-    check_param_no_empty(view);
-    check_param_types<Quote>(view);
-
-    ExprList ls{};
-    for(auto && q : view){
-        auto && [exprs] = std::get<Quote>(q);
-        for(auto & e : exprs)
-            ls.emplace_back(e);
+    if(!q.holds<ast::List>() || q.get_if<ast::List>()->ref().empty()){
+        throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(q))};
     }
-    return Quote{std::move(ls)};
+
+    return q.get_if<ast::List>()->ref()[0];
+}
+
+ast::SExpr builtin_cdr(Closure & cls , ast::List & list){
+    check_size(2 , list.ref());
+    check_expr_type<ast::Quote>(list.ref()[1]);
+
+    auto &q = list.ref()[1].get_if<ast::Quote>()->ref();
+    if(!q.holds<ast::List>() || q.get_if<ast::List>()->ref().empty()){
+        throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(q))};
+    }
+    cexpr::vector<ast::SExpr> ls{};
+    for(auto & v : std::ranges::subrange(list.ref().begin() + 1 , list.ref().end()))
+        ls.emplace_back(v);
+
+    return ast::List{std::move(ls)};
+}
+
+std::string_view builtin_var_name(std::size_t n){
+    // var_names should have static lifttime to avoid dangling ref
+    static std::vector<std::string> var_names{};
+    for(auto i = var_names.size() ; i <= n ; ++i ){
+        var_names.emplace_back(fmt::format("@{}",i));
+    }
+    return var_names[n];
+}
+
+ast::Lambda make_builtin_lambda(std::string_view name , std::size_t n_bound_vars){
+    ast::List body = cexpr::vector<ast::SExpr>{ast::BuiltinFn{name}};
+    cexpr::vector<std::string_view> vars{};
+
+    for(std::size_t i = 0 ; i < n_bound_vars ; ++i){
+        auto var_name = builtin_var_name(i);
+        body.mut().emplace_back(ast::Atom{var_name});
+        vars.emplace_back(name);
+    }
+
+    return ast::Lambda {
+        .var_names = std::move(vars),
+        .body = ast::SExpr{body},
+    };
 }
 
 }
 
-//builtin initialize
-Environment::Environment() {
-    add_function("+" , builtin_bin_op<std::plus<Number>>);
-    add_function("-" , builtin_bin_op<std::minus<Number>>);
-    add_function("*" , builtin_bin_op<std::multiplies<Number>>);
-    add_function("/" , builtin_bin_op<std::divides<Number>>);
+void Runtime::init_builtins(){
+    auto add_builtin = [&](std::string_view name ,Runtime::builtin_func f , std::size_t n){
+        this->builtin_functions[name] = f;
+        this->_global.set(name , make_builtin_lambda(name , n));
+    };
 
-    add_function("list" , builtin_list);
-    add_function("head" , builtin_head);
-    add_function("tail" , builtin_tail);
-    add_function("eval" , builtin_eval);
-    add_function("join" , builtin_join);
-    add_function("defvar",builtin_defvar);
+    add_builtin("car" , builtin_car , 1);
+    add_builtin("cdr" , builtin_cdr , 1);
 }

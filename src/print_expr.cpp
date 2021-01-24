@@ -2,8 +2,10 @@
 #include <fmt/ranges.h>
 
 #include "lispy.h"
+#include "ast.h"
 
 using namespace lispy;
+using namespace std::literals;
 
 struct default_format_parser{
     constexpr auto parse(fmt::format_parse_context & ctx){
@@ -13,40 +15,41 @@ struct default_format_parser{
     }
 };
 template<>
-struct fmt::formatter<Quote> : default_format_parser{
+struct fmt::formatter<ast::Quote> : default_format_parser{
     template<class Context >
-    auto format(const Quote & q , Context & ctx){
-        return format_to(ctx.out() , "quote({})" , fmt::join(q.exprs.begin(), q.exprs.end() , " "));
+    auto format(const ast::Quote & q , Context & ctx){
+        return format_to(ctx.out() , "'{}" , q.ref());
     }
 };
 template<>
-struct fmt::formatter<SExpr> : default_format_parser{
+struct fmt::formatter<ast::List> : default_format_parser{
     template<class Context>
-    auto format(const SExpr & sexpr , Context & ctx){
-        auto & [s] = sexpr;
-        return format_to(ctx.out() , "({})" , fmt::join(s.begin(), s.end() , " "));
-    }
-};
-template<>
-struct fmt::formatter<Symbol> : default_format_parser{
-    template<class Context>
-    auto format(Symbol s , Context & ctx){
-        return format_to(ctx.out() , "{}" , s.identifier);
+    auto format(const ast::List & list , Context & ctx){
+        return format_to(ctx.out() , "({})" , fmt::join(list->begin(), list->end() , " "));
     }
 };
 
 template<>
-struct fmt::formatter<Function> : default_format_parser{
+struct fmt::formatter<ast::Lambda> : default_format_parser{
     template<class Context>
-    auto format(Function f , Context & ctx){
-        return format_to(ctx.out() , "{}" , f.name);
+    auto format(const ast::Lambda & f , Context & ctx){
+        return format_to(ctx.out() , "#<procedure>");
     }
 };
 
 template<>
-struct fmt::formatter<Expr> : default_format_parser{
+struct fmt::formatter<ast::BuiltinFn> : default_format_parser{
     template<class Context>
-    auto format (const Expr & s , Context & ctx){
+    auto format(const ast::BuiltinFn & f , Context & ctx){
+        return format_to(ctx.out() , "#<builtin procedure:{}>" , f.name);
+    }
+};
+
+
+template<>
+struct fmt::formatter<ast::SExpr> : default_format_parser{
+    template<class Context>
+    auto format (const ast::SExpr & s , Context & ctx){
         using RetIt = decltype(ctx.out());
         return s.match<RetIt>([&](auto && e) mutable{
             return format_to(ctx.out() , "{}" , e);
@@ -56,7 +59,7 @@ struct fmt::formatter<Expr> : default_format_parser{
 
 namespace lispy {
 
-std::string print_expr(const Expr & e){
+std::string ast::print_sexpr(const ast::SExpr & e){
     return fmt::format("{}" , e);
 }
 

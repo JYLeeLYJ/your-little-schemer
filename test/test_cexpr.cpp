@@ -4,7 +4,8 @@
 #include "constexpr_containers.hpp"
 
 using cexpr::vector;
-using cexpr::Box;
+using cexpr::box;
+using cexpr::cow;
 
 constexpr auto test_const(){
     int n = 0;
@@ -29,16 +30,17 @@ constexpr auto test_cv_copy(){
 }
 
 constexpr bool test_box_const(){
-    Box b{1};
+    box b{1};
     static_assert(std::is_same_v<typename decltype(b)::element_type , int>);
     return *b == 1;
 }
 
+static_assert(test_const() == 4);
+static_assert(test_cv().size() == 4);
+static_assert(test_cv_copy() == 7);
+static_assert(test_box_const());
+
 TEST(test_cexpr , test_vector){
-    static_assert(test_const() == 4);
-    static_assert(test_cv().size() == 4);
-    static_assert(test_cv_copy() == 7);
-    static_assert(test_box_const());
 
     vector<int> v{1,2,3,4};
     EXPECT_EQ(v.size() , 4);
@@ -78,7 +80,42 @@ TEST(test_cexpr , test_vector){
 }
 
 TEST(test_cexpr , test_box){
-    Box b{1};   
+    box b{1};   
     EXPECT_TRUE(b);
     EXPECT_EQ(*b , 1);
+}
+
+TEST(test_cexpr , test_cow){
+    cow c1{1};
+    EXPECT_EQ(c1.cnt() , 1);
+    EXPECT_EQ(c1.ref() , 1);
+    cow c2 = c1;
+    EXPECT_EQ(std::addressof(c1.ref()) , std::addressof(c2.ref()));
+    EXPECT_EQ(c1.cnt() , 2);
+
+    auto & c3 = c2;
+    EXPECT_EQ(c3.cnt() , 2);
+
+    auto c4 = c3.clone() ;
+    EXPECT_EQ(c4.cnt() ,1 );
+
+    c3.into_owned();
+    EXPECT_EQ(c1.cnt() , 1);
+    EXPECT_EQ(c3.cnt() , 1);
+
+    auto c5 = c3;
+    EXPECT_EQ(c5.cnt() , 2);
+    c5.mut() = 4;
+    EXPECT_EQ(c5.ref() , 4);
+    EXPECT_EQ(c5.cnt() , 1);
+    EXPECT_EQ(c3.cnt() , 1);
+
+    EXPECT_EQ(c3 , c1);
+
+    cow n{1};
+    auto before = &n.ref();
+    auto eval = [](cow<int> & v){v.mut(); return v;};
+    n = eval(n);
+    EXPECT_EQ(n.cnt() , 1);
+    EXPECT_EQ(&n.ref() , before);
 }

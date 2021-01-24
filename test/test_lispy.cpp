@@ -1,110 +1,69 @@
 #include <gtest/gtest.h>
 
+#include "ast.h"
 #include "lispy.h"
 #include "runtime.h"
 
 using namespace lispy;
 
-constexpr auto default_visitor = [](auto && _){};
-
-using cexpr::vector;
+using cexpr::vector , cexpr::cow ,cexpr::box ;
+using ast::parse;
 
 TEST(test_lispy , test_types){
-    Symbol s = Symbol{"+"};
-    Number n {1};
-    const SExpr sexpr{ExprList{s,n}};
 
-    Expr e{sexpr};
+    ast::Atom a = "+" , b = "-";
+    const ast::List ls({a , b});
+    ast::SExpr e{ls};
+    auto e2 = e;
 
-    auto & [v] = sexpr;
-    EXPECT_EQ(v.size() , 2);
-    v[0] .match( overloaded{
-        [&](Symbol x){EXPECT_EQ(x , s);},
-        default_visitor,
-    });
-    v[1] .match( overloaded{
-        [&](Number x){EXPECT_EQ(x,n);},
-        default_visitor,       
-    });
+    EXPECT_EQ(ls->size() , 2);
+    EXPECT_TRUE((*ls)[0].holds<ast::Atom>());
+    EXPECT_EQ(a , (*ls)[0].get<ast::Atom>());
 
-    vector<Expr> ve{Symbol{"-"}};
-    EXPECT_EQ(ve.size() , 1);
-    EXPECT_EQ(ve.capacity() , 1);
-    ve.push_back(Symbol{"-"}); 
-
-    EXPECT_EQ(ve.capacity() , 2);
 }
 
-std::optional<Expr> parse_expr(std::string_view str);
+TEST(test_lispy , test_parse){
 
-TEST(test_lispy , test_sexpr2){
-    auto n = parse_expr("-123");
-    auto s = parse_expr("/  ");
-    auto e = parse_expr("(+ 1 2)");
+    EXPECT_TRUE (parse("123").value().holds<ast::Atom>());
+    auto res1 = parse("eval");
+    ASSERT_TRUE (res1);
+    EXPECT_EQ   (res1->get<ast::Atom>() , "eval");
+    EXPECT_TRUE (parse("'()").value().holds<ast::Quote>());
+    auto empty= parse("()");
+    ASSERT_TRUE (empty);
+    ASSERT_TRUE (empty.value().holds<ast::List>());
+    EXPECT_EQ   (empty.value().get<ast::List>()->size() , 0);
     
-    ASSERT_TRUE(n && std::holds_alternative<Number>(n->var()));
-    ASSERT_TRUE(s && std::holds_alternative<Symbol>(s->var()));
-    ASSERT_TRUE(e && std::holds_alternative<SExpr> (e->var()));
+    auto res2 = parse("( eval )");
+    ASSERT_TRUE (res2);
+    EXPECT_TRUE (res2->holds<ast::List>() && res2->get<ast::List>().ref()[0].holds<ast::Atom>());
+    EXPECT_EQ   (res2->get<ast::List>().ref()[0].get<ast::Atom>() , "eval");
 
-    EXPECT_EQ( *n  , Expr{-123});
-    EXPECT_EQ( *s  , Expr{Symbol{"/"}});
+    EXPECT_TRUE (parse("(eval ( ))"));
+    EXPECT_TRUE (parse("(())"));
+}
 
-    //sexpr should be {Add , 1 , 2}
-    const auto & [sexpr] = std::get<SExpr>(e->var());
-    EXPECT_EQ(sexpr.size() , 3);
-    EXPECT_FALSE(sexpr[0].valueless_by_exception());
-    EXPECT_EQ(sexpr[0].var() , Expr{Symbol{"+"}});
-    EXPECT_TRUE(std::holds_alternative<Symbol>(sexpr[0]));
-    EXPECT_TRUE(std::holds_alternative<Number>(sexpr[1]));
-    EXPECT_TRUE(std::holds_alternative<Number>(sexpr[2]));
-
-    auto e2 = parse_expr("(+1 2)");
-    EXPECT_TRUE(e2 && std::holds_alternative<SExpr>(*e2));
+// TEST(test_lispy , test_eval){
     
-    auto & [sexpr2] = std::get<SExpr>(*e2);
-    EXPECT_EQ(sexpr2.size() , 2);
-    EXPECT_TRUE(std::holds_alternative<Symbol>(sexpr2[0]));
-}
- 
-TEST(test_lispy , test_sexpr3){
-    auto es = parse_lispy("+ 1 2 ");
-    EXPECT_TRUE(es);
-    EXPECT_TRUE(std::holds_alternative<SExpr>(*es));
-    EXPECT_EQ(std::get<SExpr>(*es).exprs.size() , 3);
+//     EXPECT_EQ(eval("defvar {x} 100") , "()");
+//     EXPECT_EQ(eval("defvar {y} 200") , "()");
 
-    auto es2 = parse_lispy("{1 2 3 4}");
-    EXPECT_TRUE(es2);
-    EXPECT_TRUE(std::holds_alternative<Quote>(*es2));
-    EXPECT_EQ(std::get<Quote>(*es2).exprs.size() , 4);
-    EXPECT_EQ(std::get<Quote>(*es2) , (Quote{ExprList{1,2,3,4}}));
-}
+//     auto e_x = parse_lispy("x").value();
+//     ASSERT_TRUE(std::holds_alternative<SExpr>(e_x));
+//     eval_expr(Runtime::environment() , e_x); 
+//     EXPECT_TRUE(std::holds_alternative<Number>(e_x));
 
-TEST(test_lispy , test_eval){
-    auto expr1 = parse_lispy("+ (+ 1 (* 7 5)) 3").value();
-    auto expr2 = parse_lispy("(- 1 100)").value();
+//     EXPECT_EQ(eval("x") , "100");
+//     EXPECT_EQ(eval("y") , "200");
 
-    eval_expr(expr1); 
-    eval_expr(expr2);
+//     EXPECT_EQ(eval("+ x y") , "300");
 
-    EXPECT_EQ(std::get<Number>(expr1) , 39);
-    EXPECT_EQ(std::get<Number>(expr2) , -99);
-}
+//     EXPECT_EQ(eval("list 1 2 3 4") , "quote(1 2 3 4)");
 
-TEST(test_lispy , test_builtin){
-    
-    EXPECT_EQ(eval("defvar {x} 100") , "()");
-    EXPECT_EQ(eval("defvar {y} 200") , "()");
-
-    // EXPECT_TRUE(Runtime::environment().contains_symbol("x"));
-    // EXPECT_TRUE(Runtime::environment().contains_symbol("y"));
-
-    auto e_x = parse_lispy("x").value();
-    ASSERT_TRUE(std::holds_alternative<SExpr>(e_x));
-    eval_expr(e_x);
-    EXPECT_TRUE(std::holds_alternative<Number>(e_x));
-
-    EXPECT_EQ(eval("x") , "100");
-    EXPECT_EQ(eval("y") , "200");
-
-    EXPECT_EQ(eval("+ x y") , "300");
-}
+//     EXPECT_EQ(eval("defvar {ls} {1 2  3 4}") , "()");
+//     EXPECT_EQ(eval("ls") , "quote(1 2 3 4)");
+//     EXPECT_EQ(eval("head ls") , "1");
+//     EXPECT_EQ(eval("tail ls") , "4");
+//     EXPECT_EQ(eval("join {1 2 3} {4 5}") , "quote(1 2 3 4 5)");
+//     EXPECT_EQ(eval("eval {list 1 2 3}") , "quote(1 2 3)");
+// }

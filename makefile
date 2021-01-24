@@ -1,11 +1,11 @@
 # compiling vars
-CXX := clang++
+CXX := g++
 CPPSTANDARD := c++20
 OPT := -O3
 LINK:= -ledit
 DEFINE := -DFMT_HEADER_ONLY
 INCLUDE := ./include
-CXXFLAG := $(OPT) -Wall -std=$(CPPSTANDARD) $(DEFINE) -I$(INCLUDE) #-fconcepts-diagnostics-depth=10
+CXXFLAG := $(OPT) -Wall -std=$(CPPSTANDARD) $(DEFINE) -I$(INCLUDE) -ftemplate-backtrace-limit=0 #-fconcepts-diagnostics-depth=10
 
 # main building vars
 TEMP_OBJ_DIR := ./tmp
@@ -44,3 +44,7 @@ clean :
 	rm -rf bin/*
 	rm -rf tmp/*.o
 	rm -rf tmp/test/*.o
+
+test_cexpr: tmp/test/test_cexpr.o
+	$(CXX) tmp/test/test_cexpr.o -o bin/test_cexpr $(CXXFLAG) -lgtest -lpthread -lgtest_main
+	bin/test_cexpr

@@ -1,9 +1,8 @@
 #include <variant>
 #include <optional>
-#include <numeric>
-#include <stdexcept>
 
 #include "parsec.h"
+#include "ast.h"
 #include "lispy.h"
 
 using namespace pscpp;
@@ -11,65 +10,45 @@ using namespace lispy;
 
 namespace {
 
-Expr to_number(std::optional<char> op, std::string_view nums){
-    int n = std::accumulate(nums.begin() , nums.end(), 0 , [](int init , char i ){return init * 10 + ( i - '0');});
-    return Number{op ? -n : n};
+ast::SExpr from_atom(std::string_view s){
+    return s;
+}
+ast::SExpr from_list(cexpr::vector<ast::SExpr> &&list){
+    return ast::List{std::move(list)};
+}
+ast::SExpr from_quote(ast::SExpr s){
+    return ast::Quote{s};
 }
 
-Expr to_sym(std::string_view s){ 
-    return Symbol{s};
-}
+/*                                                    
+    integer: /-?[0-9]+/ ;                              
 
-Expr to_sexpr(ExprList && e){
-    return SExpr{std::move(e)};
-}
+    atom   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;        
+    sexpr  : <atom> | <quote> | <list>   ;             
+    quote  : '\'' <sexpr>       ;                      
+    list   : '(' <sexpr>* ')'   ;                      
+    lispy  : /^/ <sexpr> /$/ ;                           
+*/ 
+auto sexpr(std::string_view str) -> parser_result<ast::SExpr> ;
 
-Expr to_quote(ExprList && q){
-    return Quote{std::move(q)};
-}
+auto atom       = fmap(from_atom    , chars(letter | digit | one_of("_+-*/\\=<>!&")));
+auto list       = fmap(from_list    ,'('_char >> spaces >> sepby(sexpr , spaces1) << spaces << ')'_char);
+auto quote      = fmap(from_quote   ,'\''_char >> sexpr);
+auto sexpr_impl = (atom | quote | list );
+auto lispy_     = spaces >> sexpr_impl << eof;
 
-/*                                                     \
-    number : /-?[0-9]+/ ;                              \
-    symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;        \
-    sexpr  : '(' <expr>* ')' ;                         \
-    qexpr  : '{' <expr>* '}' ;                         \
-    expr   : <number> | <symbol> | <sexpr> | <qexpr> ; \
-    lispy  : /^/ <expr>* /$/ ;                         \
-*/
-
-auto _expr(std::string_view str) -> parser_result<Expr> ;
-
-auto numbers    = fmap(to_number    , option('-'_char)  , chars(digit));
-auto symbol     = fmap(to_sym       , chars(letter | digit | one_of("_+-*/\\=<>!&")));
-auto expr_ls    = spaces >> sepby(_expr , spaces1) << spaces ;
-auto sexpr      = fmap(to_sexpr     , '('_char >> expr_ls << ')'_char) ;
-auto quote      = fmap(to_quote     , '{'_char >> expr_ls << '}'_char) ;
-auto expr       = numbers | symbol | sexpr | quote ;// ;
-auto lispy_     = expr_ls << eof ; 
-
-auto _expr(std::string_view str) -> parser_result<Expr> {
-    return expr(str);
+auto sexpr(std::string_view str) -> parser_result<ast::SExpr>{
+    return sexpr_impl(str);
 }
 
 }
 
 namespace lispy{
 
-std::optional<Expr> parse_lispy(std::string_view str){
-    auto result = lispy_(str);
-    if(!result)  return {};
-    
-    auto & expr_list = result.value().first;
-    if(expr_list.size() == 1 && !std::holds_alternative<Symbol>(expr_list[0]))
-        return std::move(expr_list[0]);
-    else 
-        return SExpr{std::move(expr_list)};
+std::optional<ast::SExpr> ast::parse(std::string_view input) {
+    auto result = lispy_(input);
+    return result? std::optional{result->first} : std::nullopt ;
 }
 
 }
 
-std::optional<Expr> parse_expr(std::string_view str){
-    auto result = expr(str);
-    if(result) return result.value().first;
-    else return {};
-}

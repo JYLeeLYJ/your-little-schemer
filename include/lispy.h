@@ -1,88 +1,29 @@
 #pragma once
 
-#include <optional>
-#include <string_view>
-#include <variant>
-#include <string>
-
-#include "constexpr_containers.hpp"
+#include <exception>
 
 namespace lispy{
 
+using exception_base = std::logic_error;
 
-std::optional<int> parse_polish(std::string_view str) ;
-
-using Number = int;
-
-struct Symbol {
-    std::string_view identifier;
-    constexpr bool operator == (const Symbol & s) const = default;
+struct parse_error : exception_base{
+    using exception_base::exception_base;
 };
 
-struct Function{
-    std::string_view name;
-    constexpr bool operator == (const Function & s) const = default;
+struct bad_syntax : exception_base {
+    using exception_base::exception_base;
 };
 
-struct Variable{};
-
-struct Expr;
-using ExprList = cexpr::vector<Expr> ;
-struct SExpr{
-    ExprList exprs;
-    constexpr bool operator == (const SExpr & q) const = default;
+struct type_error : exception_base{
+    using exception_base::exception_base;
 };
 
-struct Quote{
-    ExprList exprs;
-    constexpr bool operator == (const Quote & q) const = default;
+struct runtime_error : exception_base{
+    using exception_base::exception_base;
 };
 
-using ExprBase = std::variant<Number , Symbol , SExpr , Quote ,Function>;
-struct Expr : ExprBase{
-    using ExprBase::variant;
-
-    template<class V>
-    constexpr auto match(V && vis) const { 
-        return std::visit( std::forward<V>(vis) , var());
-    }
-    template<class V>
-    constexpr auto match(V && vis){
-        return std::visit(std::forward<V>(vis), var());
-    }
-    template<class R , class V>
-    constexpr R match(V && vis)  {
-        return std::visit<R>(std::forward<V>(vis) , var());
-    }
-    template<class R , class V>
-    constexpr R match(V && vis) const {
-        return std::visit<R>(std::forward<V>(vis) , var());
-    }
-
-    template<class T>
-    constexpr bool holds() const {
-        return std::holds_alternative<T>(*this);
-    }
-
-    template<class T>
-    constexpr decltype(auto) get() {
-        return std::get<T>(var());
-    }
-
-    constexpr ExprBase & var(){return *this;}
-    constexpr const ExprBase & var() const {return *this;}
-    constexpr bool operator== (const Expr & rhs){ return var() == rhs.var();}
+struct internal_error : std::runtime_error{
+    using std::runtime_error::runtime_error;
 };
-
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
-std::optional<Expr> parse_lispy(std::string_view);
-
-std::string print_expr(const Expr &);
-
-void eval_expr(Expr & );
-
-std::string eval(std::string_view);
 
 }
