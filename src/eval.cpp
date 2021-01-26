@@ -15,39 +15,31 @@ namespace lispy {
 
 namespace {
 
-void eval_sexpr(Closure & cls , ast::SExpr & sexpr);
-    
 ast::SExpr eval_def(Closure & cls , ast::List & list){
-    if(list->size() != 3 || !list.ref()[1].holds<ast::Atom>() )
+    if(list->size() != 3 || !list.ref()[1].holds<ast::Symbol>() )
         throw bad_syntax(fmt::format(
-            "define : incorrect syntax in {} , expect (define symbol s-expression )" , ast::print_sexpr(ast::SExpr{list})));
+            "define : bad syntax in {}." , ast::print_sexpr(ast::SExpr{list})));
     
     auto & iden = list.ref()[1];
     auto value = list.ref()[2];
-    eval_sexpr(cls , value);
-    // if(auto p_lambda = value.get_if<ast::Lambda>() ; p_lambda)
-    //     p_lambda->name = iden.get<ast::Atom>();
-    cls.global().set(iden.get<ast::Atom>() , value);
+    Runtime::eval_sexpr(cls , value);
+    cls.global().set(iden.get<ast::Symbol>() , value);
     return iden;
 }
 
 ast::SExpr eval_lambda(Closure & cls , ast::List & list){
     if(list->size() != 3 || !list.ref()[1].holds<ast::List>()) 
-        throw bad_syntax(fmt::format("lambda : incorrect syntax in {} , expect (lambda (symbol *) s-expression)" , ast::print_sexpr(ast::SExpr{list}))); 
+        throw bad_syntax(fmt::format("lambda : bad syntax , in {} . " , ast::print_sexpr(ast::SExpr{list}))); 
 
     auto & params = list.ref()[1].get<ast::List>();
     for(auto & e : params.ref())
-        if(!e.holds<ast::Atom>()) 
-            throw bad_syntax(fmt::format(
-                "it must be a symbol denoted the parameter of lambda , in {} , expect a symbol. ",
-                ast::print_sexpr(e)));
+        if(!e.holds<ast::Symbol>()) 
+            throw bad_syntax(fmt::format("lambda : bad syntax , expect a symbol , in {} . ",ast::print_sexpr(e)));
     
-    ast::Lambda lambda{
-        .body = list.ref()[2]
-    };
+    ast::Lambda lambda{.body = list.ref()[2]};
 
     for(auto & e : params.ref()) 
-        lambda.var_names.mut().emplace_back(e.get<ast::Atom>());
+        lambda.var_names.mut().emplace_back(e.get<ast::Symbol>());
 
     return lambda;
 }
@@ -62,7 +54,7 @@ ast::SExpr invoke_function(Closure & cls , ast::List & list){
     auto & lambda = list.mut().begin()->get<ast::Lambda>();
     auto n_except = lambda.var_names->size() - lambda.bounded->size();
     // too many arguments
-    if(n_except < list->size())
+    if(n_except < list->size() -1 )
         throw runtime_error(fmt::format(
             "argument size mismatch in {}, expect {} , got {} , ",
             ast::print_sexpr(list) , n_except , list->size()));
@@ -74,14 +66,14 @@ ast::SExpr invoke_function(Closure & cls , ast::List & list){
     if(lambda.var_names->size() - lambda.bounded->size() > 0){
         return lambda;
     }
-    // eval
+    //invoke
     else{
         Environment tmp_env{};
         for(std::size_t i = 0 ; i < lambda.var_names->size() ; ++i){
             tmp_env.set(lambda.var_names.ref()[i] , lambda.bounded.ref()[i]);
         }
         auto auto_pop = cls.push(tmp_env);
-        eval_sexpr(cls , lambda.body.mut());
+        Runtime::eval_sexpr(cls , lambda.body.mut());
         return lambda.body.ref();
     }
 }
@@ -90,14 +82,17 @@ ast::SExpr eval_list(Closure & cls , ast::List & list){
     if(list->size() == 0) 
         throw runtime_error("missing procedure expression , given emtpy ().");
 
-    auto & head = * (list->begin());
     //1. statement 
-    if(auto iden = head.get_if<ast::Atom>() ; iden && builtin_syntax.contains(*iden)){
-        return builtin_syntax.at(*iden) (cls , list);
+    {
+        auto & head = * (list->begin());
+        if(auto iden = head.get_if<ast::Symbol>() ; iden && builtin_syntax.contains(*iden)){
+            return builtin_syntax.at(*iden) (cls , list);
+        }
     }
     //2. procedure
     //TODO : avoid list mut
-    for(auto & e : list.mut()) eval_sexpr(cls ,e);
+    for(auto & e : list.mut()) Runtime::eval_sexpr(cls ,e);
+    auto & head = * (list->begin());
     if(head.holds<ast::Lambda>()){
         return invoke_function(cls ,list);
     }else if(head.holds<ast::BuiltinFn>()) {
@@ -106,20 +101,36 @@ ast::SExpr eval_list(Closure & cls , ast::List & list){
     }
     //3. false
     else 
-        throw runtime_error(fmt::format("not a procedure , given {}" , ast::print_sexpr(head)));
+        throw runtime_error(fmt::format(
+            "not a procedure , given {} , \nin {}" , 
+            ast::print_sexpr(head),ast::print_sexpr(list))
+        );
 }
 
-void eval_sexpr(Closure & cls , ast::SExpr & sexpr){
+}
+
+bool is_need_quote(const ast::SExpr & e ){
+    return (e.holds<ast::Quote>() || e.holds<ast::List>() || e.holds<ast::Symbol>());
+}
+
+ast::SExpr Runtime::quote(ast::SExpr e){
+    return is_need_quote(e) ? ast::SExpr{ast::Quote{std::move(e)}} : e;
+}
+
+void Runtime::eval_sexpr(Closure & cls , ast::SExpr & sexpr){
     sexpr.match(overloaded{
-        [&] (ast::List & l)     { sexpr = eval_list(cls , l); },
-        [&] (ast::Atom & name)  {   
+        [&] (ast::List & l)     { 
+            sexpr = eval_list(cls , l); 
+        },
+        [&] (ast::Symbol & name){   
             if(auto v = cls.find(name) ; v) sexpr = *v;
             else throw runtime_error(fmt::format("undefined {}" , name));
         },
+        [&] (ast::Quote & q)    {
+            if(! is_need_quote(q.ref())) sexpr = q.ref();
+        },
         []  (auto && _)         {   /* do nothing */},
     });
-}
-
 }
 
 std::optional<ast::SExpr> Closure::find(std::string_view name) noexcept{
@@ -134,8 +145,8 @@ std::string Runtime::eval(std::string_view input){
     if(!result) throw parse_error("parse error.");
     auto & rt = Runtime::instance();
     //TODO : exception safety
-    if(result->holds<ast::List>() || result->holds<ast::Atom>())
-        eval_sexpr(rt._cls , *result);
+    if(result->holds<ast::List>() || result->holds<ast::Symbol>() || result->holds<ast::Quote>())
+        Runtime::eval_sexpr(rt._cls , *result);
     return print_sexpr(*result);
 }
 

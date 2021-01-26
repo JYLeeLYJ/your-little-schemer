@@ -118,4 +118,21 @@ TEST(test_cexpr , test_cow){
     n = eval(n);
     EXPECT_EQ(n.cnt() , 1);
     EXPECT_EQ(&n.ref() , before);
+
+    struct foo{
+        int i;
+        foo(int n):i(n){}
+        foo(const foo & ) = default;
+        foo & operator=(const foo &) = default;
+        bool operator== (const foo & ) const = default;
+        ~foo(){i=0;}
+    };
+
+    using var = std::variant<cow<foo>, foo>;
+    var a{cow{foo{1}}};
+    ASSERT_EQ(std::get<cow<foo>>(a).cnt() ,1);
+    a = std::get<cow<foo>>(a).mut();
+
+    ASSERT_TRUE(std::holds_alternative<foo>(a));
+    ASSERT_EQ(std::get<foo>(a) , foo{1});
 }

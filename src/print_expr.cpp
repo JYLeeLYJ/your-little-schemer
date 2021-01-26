@@ -41,10 +41,9 @@ template<>
 struct fmt::formatter<ast::BuiltinFn> : default_format_parser{
     template<class Context>
     auto format(const ast::BuiltinFn & f , Context & ctx){
-        return format_to(ctx.out() , "#<builtin procedure:{}>" , f.name);
+        return format_to(ctx.out() , "#<builtin :{}>" , f.name);
     }
 };
-
 
 template<>
 struct fmt::formatter<ast::SExpr> : default_format_parser{

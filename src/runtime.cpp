@@ -11,63 +11,157 @@ using namespace lispy;
 
 namespace{
 
-using ExprListView = cexpr::vector<ast::SExpr> ;
+using ExprList = cexpr::vector<ast::SExpr> ;
 
 template<class T> 
 const char * name () {
     if constexpr (std::is_same_v<T , ast::SExpr>) 
         return "SExpr" ;
-    else if constexpr (std::is_same_v<T , ast::Atom>)
-        return "Atom";
+    else if constexpr (std::is_same_v<T , ast::Symbol>)
+        return "Symbol";
     else if constexpr (std::is_same_v<T , ast::Quote>)
         return "Quote";
     else if constexpr (std::is_same_v<T , ast::Lambda>)
-        return "Procedure";
+        return "Lambda";
+    else if constexpr (std::is_same_v<T , ast::Boolean>)
+        return "Boolean";
+    else if constexpr (std::is_same_v<T , ast::Integer>)
+        return "Integer";
+    else if constexpr (std::is_same_v<T , ast::BuiltinFn>)
+        return "BuiltinFunction";
     else 
         return typeid(T).name();
 }
 
-void check_size(std::size_t sz , const ast::List & view){
-    if(view->size() != sz) 
+std::string_view current_type_name(const ast::SExpr & sexpr){
+    return sexpr.match<std::string_view>(
+        [](auto && v) {
+            return name<std::decay_t<decltype(v)>>();
+        }
+    );
+}
+
+const ast::SExpr & get_param(std::size_t n , ast::List & params){
+    return params.ref()[n+1];
+}
+template<class T>
+const T & get_param_unsafe_cast(std::size_t n , ast::List &params){
+    return * (params.ref()[n + 1].get_if<T>());
+}
+
+class schemer{
+    const ast::List & _params;
+    std::size_t i {1};
+public:
+    schemer(const ast::List & params , std::size_t n_params) 
+    : _params(params){
+        if(params->empty() || params->size() -1 != n_params) 
         throw runtime_error{fmt::format(
             "incorrect parameter number , got {} params , expect {} , \nin : {}" ,
-             view->size() - 1, sz -1 , ast::print_sexpr(ast::SExpr{view}))};
-}
+             params->size() - 1, n_params , ast::print_sexpr(params))};
+    }
 
-template<class T>
-void check_expr_type(const ast::SExpr & e) {
-    if(!e.holds<T>())
-        throw type_error{fmt::format(
-            "{} should have type {} , but got {}" , 
-            ast::print_sexpr(e) , name<T>() , name<std::remove_cvref_t<decltype(e)>>())};
-}
+    schemer & next(){ ++i ; return *this;}
 
-ast::SExpr builtin_car(Closure & cls , ast::List & list){
-    check_size(2 ,list.ref());
-    check_expr_type<ast::Quote>(list.ref()[1]);
-    
-    auto & q = list.ref()[1].get_if<ast::Quote>()->ref();
+    template<class T>
+    schemer & type(){
+        if( i >= _params->size()) 
+            throw internal_error{fmt::format("invalid out of range schemer in {}" , ast::print_sexpr(_params.ref()[0]))};
+        auto & param_i = _params.ref()[i];
+        if(!param_i.holds<T>())
+            throw type_error{fmt::format(
+                "param {} should have type {} , but got {} \nin: {}",
+                i - 1 , name<T>() , current_type_name(param_i), ast::print_sexpr(_params)
+            )};
+        return *this;
+    }
 
+};
+
+ast::SExpr builtin_car(Closure & cls , ast::List & params){
+    schemer(params , 1)
+    .type<ast::Quote>();
+
+    auto & q = params.ref()[1].get_if<ast::Quote>()->ref();
     if(!q.holds<ast::List>() || q.get_if<ast::List>()->ref().empty()){
         throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(q))};
     }
 
-    return q.get_if<ast::List>()->ref()[0];
+    return Runtime::quote(q.get_if<ast::List>()->ref()[0]);
 }
 
-ast::SExpr builtin_cdr(Closure & cls , ast::List & list){
-    check_size(2 , list.ref());
-    check_expr_type<ast::Quote>(list.ref()[1]);
+ast::SExpr builtin_cdr(Closure & cls , ast::List & params){
+    schemer(params ,1 )
+    .type<ast::Quote>();
 
-    auto &q = list.ref()[1].get_if<ast::Quote>()->ref();
-    if(!q.holds<ast::List>() || q.get_if<ast::List>()->ref().empty()){
-        throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(q))};
+    auto &quote = params.ref()[1].get_if<ast::Quote>()->ref();
+    auto *quote_list = quote.get_if<ast::List>();
+    if(!quote.holds<ast::List>() || quote_list->ref().empty()){
+        throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(quote))};
     }
+
     cexpr::vector<ast::SExpr> ls{};
-    for(auto & v : std::ranges::subrange(list.ref().begin() + 1 , list.ref().end()))
+    for(auto & v : std::ranges::subrange(quote_list->ref().begin() + 1 , quote_list->ref().end()))
         ls.emplace_back(v);
 
-    return ast::List{std::move(ls)};
+    return ast::Quote{ast::List{std::move(ls)}};
+}
+
+ast::SExpr builtin_cons(Closure & cls , ast::List & params){
+    schemer(params,2)
+    .next()
+    .type<ast::Quote>();
+
+    auto & lhs = get_param(0 , params);
+    auto & rhs = get_param_unsafe_cast<ast::Quote>(1 , params);
+
+    ast::List result{ExprList{lhs}};
+    rhs.ref().match(overloaded{
+        [&](const ast::List & l) mutable{
+            for(auto & v : l.ref())
+                result.mut().emplace_back(v);
+        },
+        [&](const auto & v) mutable{
+            result.mut().emplace_back(v);
+        }
+    });
+
+    return ast::Quote{std::move(result)};
+}
+
+ast::SExpr builtin_eq(Closure & cls , ast::List & params){
+    schemer(params , 2);
+
+    auto &lhs = get_param(0 , params);
+    auto &rhs = get_param(1 , params);
+
+    return lhs.match<ast::Boolean>(
+        [&](auto & value){
+            using type = std::decay_t<decltype(value)>;
+            return (rhs.index() == lhs.index() && rhs.get<type>() == value);
+        }
+    );
+}
+
+ast::SExpr builtin_null(Closure & cls , ast::List & params){
+    schemer(params , 1);
+    auto & p = get_param(0, params);
+    if(!p.holds<ast::Quote>()) return false;
+    else {
+        auto & quote = get_param_unsafe_cast<ast::Quote>(0 , params);
+        return quote.ref().holds<ast::List>() && !quote.ref().get_if<ast::List>()->ref().empty();
+    }
+}
+
+ast::SExpr builtin_atom(Closure & cls , ast::List & params){
+    schemer(params , 1);
+    auto &p = get_param(0 , params);
+    return p.holds<ast::List>() || (p.holds<ast::Quote>() && p.get<ast::Quote>().ref().holds<ast::List>());
+}
+
+ast::SExpr builtin_zero(Closure & cls , ast::List & params){
+    schemer(params , 1).type<ast::Integer>();
+    return 0 == get_param_unsafe_cast<ast::Integer>(0 , params);
 }
 
 std::string_view builtin_var_name(std::size_t n){
@@ -85,10 +179,9 @@ ast::Lambda make_builtin_lambda(std::string_view name , std::size_t n_bound_vars
 
     for(std::size_t i = 0 ; i < n_bound_vars ; ++i){
         auto var_name = builtin_var_name(i);
-        body.mut().emplace_back(ast::Atom{var_name});
-        vars.emplace_back(name);
+        body.mut().emplace_back(ast::Symbol{var_name});
+        vars.emplace_back(var_name);
     }
-
     return ast::Lambda {
         .var_names = std::move(vars),
         .body = ast::SExpr{body},
@@ -97,12 +190,22 @@ ast::Lambda make_builtin_lambda(std::string_view name , std::size_t n_bound_vars
 
 }
 
+Runtime::Runtime() : _cls(_global) {
+    init_builtins();
+}
+
 void Runtime::init_builtins(){
     auto add_builtin = [&](std::string_view name ,Runtime::builtin_func f , std::size_t n){
-        this->builtin_functions[name] = f;
+        this->_builtin_functions[name] = f;
         this->_global.set(name , make_builtin_lambda(name , n));
     };
 
     add_builtin("car" , builtin_car , 1);
     add_builtin("cdr" , builtin_cdr , 1);
+    add_builtin("cons", builtin_cons, 2);
+    add_builtin("eq?" , builtin_eq  , 2);
+    add_builtin("atom?",builtin_atom, 1);
+    
+    add_builtin("null?",builtin_null ,1);
+    add_builtin("zero?",builtin_zero ,1);
 }

@@ -61,7 +61,7 @@ namespace lispy{
 
     //variable type 
     class Runtime {
-        Runtime() : _cls(_global) { init_builtins(); }
+        Runtime() ;
     public:
         using builtin_func = ast::SExpr (*) (Closure & , ast::List & );
 
@@ -70,14 +70,16 @@ namespace lispy{
         }
         
         static builtin_func get_builtin_func(std::string_view name){
-            return instance().builtin_functions.at(name);
+            return instance()._builtin_functions.at(name);
         }
 
         static bool is_builtin_function(std::string_view name){
-            return instance().builtin_functions.contains(name);
+            return instance()._builtin_functions.contains(name);
         }
 
         static std::string eval(std::string_view input);
+        static void eval_sexpr(Closure & cls ,ast::SExpr & sexpr);
+        static ast::SExpr quote(ast::SExpr e);
 
     private:
         void init_builtins();
@@ -85,7 +87,7 @@ namespace lispy{
         // Environment _global_tmp;
         Environment _global{};
         Closure _cls;
-        std::unordered_map<std::string_view , builtin_func> builtin_functions{};
+        std::unordered_map<std::string_view , builtin_func> _builtin_functions{};
     };
 
 }
