@@ -60,7 +60,7 @@ TEST(test_lispy , test_builtin){
     EXPECT_EQ(Runtime::eval("(cons '() '(1 2 3))") , "'('() 1 2 3)");
 
     EXPECT_EQ(Runtime::eval("(eq? '(1 2 3) '(1 2 3))") , "true");
-    EXPECT_EQ(Runtime::eval("(eq? '1 '(1 2 3)") , "false");
+    EXPECT_EQ(Runtime::eval("(eq? '1 '(1 2 3))") , "false");
 }
 
 TEST(test_lispy , test_lambda){

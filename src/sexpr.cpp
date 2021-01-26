@@ -44,6 +44,7 @@ auto sexpr(std::string_view str) -> parser_result<ast::SExpr> ;
 auto integer    = fmap(from_integer , option('-'_char) , chars(digit));
 auto boolean    = fmap(from_boolean , '#'_char >> ( one_of("tf")));
 auto literal    = boolean | integer ;
+
 auto symbol     = fmap(from_symbol  , chars(letter | one_of("_+-*/\\=<>!?&")));
 auto list       = fmap(from_list    ,'('_char >> spaces >> sepby(sexpr , spaces1) << spaces << ')'_char);
 auto quote      = fmap(from_quote   ,'\''_char >> sexpr);

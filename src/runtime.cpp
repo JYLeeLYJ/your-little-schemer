@@ -8,6 +8,7 @@
 // add builtins 
 
 using namespace lispy;
+using std::ranges::subrange;
 
 namespace{
 
@@ -45,8 +46,11 @@ const ast::SExpr & get_param(std::size_t n , ast::List & params){
     return params.ref()[n+1];
 }
 template<class T>
-const T & get_param_unsafe_cast(std::size_t n , ast::List &params){
+decltype(auto) get_param_unsafe_cast(std::size_t n , ast::List &params){
     return * (params.ref()[n + 1].get_if<T>());
+}
+decltype(auto) get_quote_list_unsafe(std::size_t n , ast::List &params){
+    return * get_param_unsafe_cast<ast::Quote>(n , params).ref().get_if<ast::List>();
 }
 
 class schemer{
@@ -76,6 +80,20 @@ public:
         return *this;
     }
 
+    schemer & listp(){
+        if( i >= _params->size()) 
+            throw internal_error{fmt::format("invalid out of range schemer in {}" , ast::print_sexpr(_params.ref()[0]))};
+        
+        auto & param_i = _params.ref()[i];
+        if(!param_i.holds<ast::Quote>() 
+        || !param_i.get_if<ast::Quote>()->ref().holds<ast::List>())
+            throw type_error{fmt::format(
+                "contracts failed , {} is not a list , \nin :{} ." ,
+                ast::print_sexpr(param_i) , ast::print_sexpr(_params) 
+            )};
+        return *this;
+    }
+
 };
 
 ast::SExpr builtin_car(Closure & cls , ast::List & params){
@@ -91,17 +109,15 @@ ast::SExpr builtin_car(Closure & cls , ast::List & params){
 }
 
 ast::SExpr builtin_cdr(Closure & cls , ast::List & params){
-    schemer(params ,1 )
-    .type<ast::Quote>();
+    schemer(params ,1 ).listp();
 
-    auto &quote = params.ref()[1].get_if<ast::Quote>()->ref();
-    auto *quote_list = quote.get_if<ast::List>();
-    if(!quote.holds<ast::List>() || quote_list->ref().empty()){
-        throw type_error{fmt::format("contract fail : not a non-empty list , in {}" , ast::print_sexpr(quote))};
+    auto &quote_list = get_quote_list_unsafe(0,params);
+    if(quote_list.ref().empty()){
+        throw type_error{fmt::format("cdr : contract fail , list is empty , in {}" , ast::print_sexpr(get_param(0,params)))};
     }
 
     cexpr::vector<ast::SExpr> ls{};
-    for(auto & v : std::ranges::subrange(quote_list->ref().begin() + 1 , quote_list->ref().end()))
+    for(auto & v : subrange(quote_list.ref().begin() + 1 , quote_list.ref().end()))
         ls.emplace_back(v);
 
     return ast::Quote{ast::List{std::move(ls)}};
@@ -110,22 +126,14 @@ ast::SExpr builtin_cdr(Closure & cls , ast::List & params){
 ast::SExpr builtin_cons(Closure & cls , ast::List & params){
     schemer(params,2)
     .next()
-    .type<ast::Quote>();
+    .listp();
 
     auto & lhs = get_param(0 , params);
-    auto & rhs = get_param_unsafe_cast<ast::Quote>(1 , params);
+    auto & rhs = get_quote_list_unsafe(1 , params);
 
     ast::List result{ExprList{lhs}};
-    rhs.ref().match(overloaded{
-        [&](const ast::List & l) mutable{
-            for(auto & v : l.ref())
-                result.mut().emplace_back(v);
-        },
-        [&](const auto & v) mutable{
-            result.mut().emplace_back(v);
-        }
-    });
-
+    for(auto & v : rhs.ref())
+        result.mut().emplace_back(v);
     return ast::Quote{std::move(result)};
 }
 
@@ -156,7 +164,10 @@ ast::SExpr builtin_null(Closure & cls , ast::List & params){
 ast::SExpr builtin_atom(Closure & cls , ast::List & params){
     schemer(params , 1);
     auto &p = get_param(0 , params);
-    return p.holds<ast::List>() || (p.holds<ast::Quote>() && p.get<ast::Quote>().ref().holds<ast::List>());
+    return !(
+        p.holds<ast::List>() ||
+        (p.holds<ast::Quote>() && p.get_if<ast::Quote>()->ref().holds<ast::List>())
+    );
 }
 
 ast::SExpr builtin_zero(Closure & cls , ast::List & params){
@@ -205,7 +216,7 @@ void Runtime::init_builtins(){
     add_builtin("cons", builtin_cons, 2);
     add_builtin("eq?" , builtin_eq  , 2);
     add_builtin("atom?",builtin_atom, 1);
-    
+
     add_builtin("null?",builtin_null ,1);
     add_builtin("zero?",builtin_zero ,1);
 }
