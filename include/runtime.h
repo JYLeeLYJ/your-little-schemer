@@ -22,7 +22,7 @@ namespace lispy{
             return it == env.end() ? std::nullopt : std::optional{it->second};
         }
         void set(std::string_view s , ast::SExpr sexpr){
-            env.emplace(s, std::move(sexpr));
+            env.insert_or_assign(s , std::move(sexpr));
         }
     };
 

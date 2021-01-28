@@ -45,6 +45,11 @@ std::string_view current_type_name(const ast::SExpr & sexpr){
 const ast::SExpr & get_param(std::size_t n , ast::List & params){
     return params.ref()[n+1];
 }
+
+ast::SExpr & get_param_mut(std::size_t n , ast::List & params){
+    return params.mut()[n+1];
+}
+
 template<class T>
 decltype(auto) get_param_unsafe_cast(std::size_t n , ast::List &params){
     return * (params.ref()[n + 1].get_if<T>());
@@ -131,7 +136,7 @@ ast::SExpr builtin_cons(Closure & cls , ast::List & params){
     auto & lhs = get_param(0 , params);
     auto & rhs = get_quote_list_unsafe(1 , params);
 
-    ast::List result{ExprList{lhs}};
+    ast::List result{ExprList{lhs.holds<ast::Quote>() ? lhs.get_if<ast::Quote>()->ref() : lhs}};
     for(auto & v : rhs.ref())
         result.mut().emplace_back(v);
     return ast::Quote{std::move(result)};
@@ -143,22 +148,26 @@ ast::SExpr builtin_eq(Closure & cls , ast::List & params){
     auto &lhs = get_param(0 , params);
     auto &rhs = get_param(1 , params);
 
-    return lhs.match<ast::Boolean>(
+    if(lhs.index() != rhs.index()) return false;
+    return lhs.match<ast::Boolean>(overloaded{
+        [&](const ast::Quote & q ){
+            if(q.ref().holds_one_of<ast::Quote , ast::Lambda , ast::List>())
+                return lhs == rhs;
+            else 
+                return q.ref() == rhs.get_if<ast::Quote>()->ref();
+        },
         [&](auto & value){
             using type = std::decay_t<decltype(value)>;
-            return (rhs.index() == lhs.index() && rhs.get<type>() == value);
-        }
-    );
+            return (rhs.get<type>() == value);
+        },
+    });
 }
 
 ast::SExpr builtin_null(Closure & cls , ast::List & params){
-    schemer(params , 1);
-    auto & p = get_param(0, params);
-    if(!p.holds<ast::Quote>()) return false;
-    else {
-        auto & quote = get_param_unsafe_cast<ast::Quote>(0 , params);
-        return quote.ref().holds<ast::List>() && !quote.ref().get_if<ast::List>()->ref().empty();
-    }
+    schemer(params , 1).listp();
+
+    auto & ls = get_quote_list_unsafe(0 , params);
+    return ls.ref().empty();
 }
 
 ast::SExpr builtin_atom(Closure & cls , ast::List & params){
@@ -173,6 +182,15 @@ ast::SExpr builtin_atom(Closure & cls , ast::List & params){
 ast::SExpr builtin_zero(Closure & cls , ast::List & params){
     schemer(params , 1).type<ast::Integer>();
     return 0 == get_param_unsafe_cast<ast::Integer>(0 , params);
+}
+
+ast::SExpr builtin_eval(Closure & cls , ast::List & params){
+    schemer(params , 1);
+    auto & p = get_param(0 , params);
+    auto sexpr = p.holds<ast::Quote>()? p.get_if<ast::Quote>()->ref() : p;
+
+    Runtime::eval_sexpr(cls , sexpr);
+    return sexpr;
 }
 
 std::string_view builtin_var_name(std::size_t n){
@@ -210,6 +228,8 @@ void Runtime::init_builtins(){
         this->_builtin_functions[name] = f;
         this->_global.set(name , make_builtin_lambda(name , n));
     };
+
+    add_builtin("eval", builtin_eval, 1);
 
     add_builtin("car" , builtin_car , 1);
     add_builtin("cdr" , builtin_cdr , 1);

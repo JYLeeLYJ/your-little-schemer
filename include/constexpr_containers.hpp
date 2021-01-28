@@ -140,13 +140,8 @@ public:
     constexpr const T & operator * () const noexcept { return _ptr->data;}
     constexpr const T * operator ->() const noexcept { return &(_ptr->data);}
 
-    constexpr bool operator == (const cow & rhs) const noexcept
-    requires(std::equality_comparable<T>){
-        return (!_ptr && !rhs._ptr) || ref() == rhs.ref();
-    }
-    constexpr bool operator == (const T & rhs) const noexcept
-    requires(std::equality_comparable<T>) {
-        return _ptr && (ref() == rhs);
+    constexpr bool operator == (const cow & rhs) const noexcept{
+        return _ptr == rhs._ptr;
     }
 
 public:

@@ -34,6 +34,10 @@ public :
     constexpr bool holds() const {
         return std::holds_alternative<T>(*this);
     }
+    template<class ...T>
+    constexpr bool holds_one_of() const{
+        return (std::holds_alternative<T>(*this) || ...);
+    }
 
     template<class T>
     constexpr decltype(auto) get() { return std::get<T>(var());}

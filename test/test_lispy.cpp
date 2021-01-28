@@ -48,6 +48,9 @@ TEST(test_lispy , test_parse){
 TEST(test_lispy , test_define){
     EXPECT_EQ(Runtime::eval("(define x '1)") , "x");
     EXPECT_EQ(Runtime::eval("x") , "1");
+
+    Runtime::eval("(define x 2)");
+    EXPECT_EQ(Runtime::eval("x") , "2");
 }
 
 TEST(test_lispy , test_builtin){
@@ -57,10 +60,10 @@ TEST(test_lispy , test_builtin){
 
     EXPECT_EQ(Runtime::eval("(cdr '(1 2 3))") , "'(2 3)");
     EXPECT_EQ(Runtime::eval("(cdr '(1))") , "'()");
-    EXPECT_EQ(Runtime::eval("(cons '() '(1 2 3))") , "'('() 1 2 3)");
+    EXPECT_EQ(Runtime::eval("(cons '() '(1 2 3))") , "'(() 1 2 3)");
 
-    EXPECT_EQ(Runtime::eval("(eq? '(1 2 3) '(1 2 3))") , "true");
-    EXPECT_EQ(Runtime::eval("(eq? '1 '(1 2 3))") , "false");
+    EXPECT_EQ(Runtime::eval("(eq? '(1 2 3) '(1 2 3))") , "false");
+    EXPECT_EQ(Runtime::eval("(eq? 1 1)") , "true");
 }
 
 TEST(test_lispy , test_lambda){
