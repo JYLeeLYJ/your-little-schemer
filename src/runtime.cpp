@@ -164,8 +164,11 @@ ast::SExpr builtin_eq(Closure & cls , ast::List & params){
 }
 
 ast::SExpr builtin_null(Closure & cls , ast::List & params){
-    schemer(params , 1).listp();
-
+    schemer(params , 1);
+    if(!get_param(0 , params).holds<ast::Quote>() 
+    || !get_param_unsafe_cast<ast::Quote>(0,params).ref().holds<ast::List>())
+        return false;
+    
     auto & ls = get_quote_list_unsafe(0 , params);
     return ls.ref().empty();
 }

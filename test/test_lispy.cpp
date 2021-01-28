@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
-
 #include "ast.h"
 #include "lispy.h"
 #include "runtime.h"
 
 using namespace lispy;
-
+using namespace std::literals;
 using cexpr::vector , cexpr::cow ,cexpr::box ;
 using ast::parse;
 
@@ -35,6 +34,8 @@ TEST(test_lispy , test_parse){
     ASSERT_TRUE (empty);
     ASSERT_TRUE (empty.value().holds<ast::List>());
     EXPECT_EQ   (empty.value().get<ast::List>()->size() , 0);
+
+    EXPECT_TRUE (parse("('eq1)"));
     
     auto res2 = parse("( eval )");
     ASSERT_TRUE (res2);
@@ -82,4 +83,21 @@ TEST(test_lispy , test_quote){
     EXPECT_EQ(Runtime::eval("(car '(car (1 2 3)))") , "'car");
 }
 
-// TEST(test_lispy , test_immutable){}
+TEST(test_lispy , test_cond){
+    constexpr auto foo = R"(
+        (define foo (lambda (x) 
+            (cond 
+                ((eq? x 0) 'is_zero)
+                ((eq? x 1) 'is_1)
+                ((null? x) 'is_null)
+                (else #f)
+            )
+        ))
+    )"sv;
+
+    ASSERT_EQ(Runtime::eval(foo) , "foo");
+    EXPECT_EQ(Runtime::eval("(foo 1)") , "'is_1");
+    EXPECT_EQ(Runtime::eval("(foo '())"), "'is_null");
+    EXPECT_EQ(Runtime::eval("(foo 0)") , "'is_zero");
+    EXPECT_EQ(Runtime::eval("(foo 2)") ,"false");
+}

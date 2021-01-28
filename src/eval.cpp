@@ -44,10 +44,43 @@ ast::SExpr eval_lambda(Closure & cls , ast::List & list){
     return lambda;
 }
 
+ast::SExpr eval_cond(Closure & cls , ast::List & list){
+    if(list->size() < 3 )
+        throw bad_syntax(fmt::format("cond : bad syntax , in {} ." , ast::print_sexpr(list)));
+
+    auto branchs = subrange(list.ref().begin() + 1 , list.ref().end());
+    if(branchs.size() < 2)
+        throw bad_syntax(fmt::format("cond : bad syntax , in {} ." , ast::print_sexpr(list)));
+
+    for(auto & e : branchs) 
+        if(!e.holds<ast::List>() || e.get_if<ast::List>()->ref().size() != 2)
+            throw bad_syntax(fmt::format("cond : bad syntax , in {}" , ast::print_sexpr(e)));
+
+    auto conds = subrange(branchs.begin() , branchs.end() - 1);
+    auto else_var = *(branchs.end() - 1);
+    if(else_var.get_if<ast::List>()->ref()[0] != ast::Symbol{"else"})
+        throw bad_syntax(fmt::format("cond : bad syntax in {} , expect (else S-Expression)" , ast::print_sexpr(list)));
+    
+    for(auto & e : conds){
+        auto & pair = *e.get_if<ast::List>();
+        auto cond = pair.ref()[0];
+        Runtime::eval_sexpr(cls , cond);
+        if(cond == ast::Boolean{true}){
+            auto value = pair.ref()[1];
+            Runtime::eval_sexpr(cls , value);
+            return value;
+        }
+    }
+    auto var = else_var.get_if<ast::List>()->ref()[1];
+    Runtime::eval_sexpr(cls , var);
+    return var;
+}
+
 std::unordered_map<std::string_view , ast::SExpr (*) (Closure & , ast::List & )>
 builtin_syntax {
     {"define"sv , eval_def},
     {"lambda"sv , eval_lambda},
+    {"cond"sv , eval_cond},
 };
 
 ast::SExpr invoke_function(Closure & cls , ast::List & list){

@@ -63,9 +63,10 @@ TEST(test_lispy , test_asserts){
     EXPECT_EQ(Runtime::eval("(atom? (car '(Harry had a heap of apples)))") , "true");
     EXPECT_EQ(Runtime::eval("(atom? eval)"), "true");
 
+    // null? in scheme allows non-list type.
     EXPECT_EQ(Runtime::eval("(null? '())") , "true");
     EXPECT_EQ(Runtime::eval("(null? '(a b c))") , "false");
-    EXPECT_ANY_THROW(Runtime::eval("(null? 'spaghetti )"));
+    EXPECT_EQ(Runtime::eval("(null? 'spaghetti )") , "false");
 
     EXPECT_EQ(Runtime::eval("(eq? (car '(Mary had a little lamb chop)) 'Mary)") , "true");
     EXPECT_EQ(Runtime::eval("(eq? ''1 ''1)") , "false");
