@@ -4,7 +4,6 @@
 
 using namespace lispy;
 
-
 TEST(test_lispy , test_car_law){
     EXPECT_EQ(Runtime::eval("(car '(a b c))") , "'a");
     EXPECT_EQ(Runtime::eval("(car '((a b c) x y z))") , "'(a b c)");
