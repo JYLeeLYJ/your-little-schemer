@@ -18,33 +18,31 @@ OBJS := $(patsubst %.cpp,$(TEMP_OBJ_DIR)/%.o,$(notdir $(SRC_FILES)))
 TEST_SRC_DIR := ./test
 TEST_FILES := $(shell ls $(TEST_SRC_DIR)/*.cpp)
 TEST_OBJS:= $(patsubst %.cpp,$(TEMP_OBJ_DIR)/test/%.o,$(notdir $(TEST_FILES)))
+LINK_TEST:= -lgtest -lpthread -lgtest_main 
 
-release: bin $(TEMP_OBJ_DIR) $(OBJS) main.cpp
+$(shell if [ ! -e bin ]; then mkdir -p bin ; fi)
+$(shell if [ ! -e $(TEMP_OBJ_DIR) ];then mkdir -p $(TEMP_OBJ_DIR); fi)
+$(shell if [ ! -e $(TEMP_OBJ_DIR)/test ]; then mkdir -p $(TEMP_OBJ_DIR)/test ; fi)
+
+-include $(OBJS:.o=.o.d)
+-include $(TEST_OBJS:.o=.o.d)
+
+release: $(OBJS) main.cpp
 	$(CXX) $(OBJS) main.cpp -o $(TARGET) $(CXXFLAG) $(LINK)
 	$(TARGET)
 
-$(TEMP_OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp $(INCLUDE)/*.h
-	$(CXX) $< -o $@ -c $(CXXFLAG)
-
-test : bin $(TEMP_OBJ_DIR) $(TEST_OBJS) $(OBJS)
-	$(CXX) $(TEST_OBJS) $(OBJS) -o bin/test $(CXXFLAG) $(LINK) -lgtest -lpthread -lgtest_main 
+test : $(TEST_OBJS) $(OBJS)
+	$(CXX) $(TEST_OBJS) $(OBJS) -o bin/test $(CXXFLAG) $(LINK_TEST) 
 	./bin/test
 
-$(TEMP_OBJ_DIR)/test/%.o: $(TEST_SRC_DIR)/%.cpp $(INCLUDE)/*.h 
-	$(CXX) $< -o $@ -c $(CXXFLAG)
+$(TEMP_OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp 
+	$(CXX) $< -o $@ -c $(CXXFLAG) -MMD -MF $@.d
 
-bin:
-	@mkdir -p bin
-
-$(TEMP_OBJ_DIR):
-	@mkdir -p $(TEMP_OBJ_DIR)
-	@mkdir -p $(TEMP_OBJ_DIR)/test
+$(TEMP_OBJ_DIR)/test/%.o: $(TEST_SRC_DIR)/%.cpp 
+	$(CXX) $< -o $@ -c $(CXXFLAG) -MMD -MF $@.d
 
 clean : 
 	rm -rf bin/*
 	rm -rf tmp/*.o
 	rm -rf tmp/test/*.o
-
-test_cexpr: tmp/test/test_cexpr.o
-	$(CXX) tmp/test/test_cexpr.o -o bin/test_cexpr $(CXXFLAG) -lgtest -lpthread -lgtest_main
-	bin/test_cexpr
+	rm -rf tmp/*.d

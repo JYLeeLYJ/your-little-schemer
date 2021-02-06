@@ -110,7 +110,7 @@ TEST(test_cexpr , test_cow){
     EXPECT_EQ(c5.cnt() , 1);
     EXPECT_EQ(c3.cnt() , 1);
 
-    EXPECT_EQ(c3 , c1);
+    EXPECT_EQ(c3.ref() , c1.ref());
 
     cow n{1};
     auto before = &n.ref();

@@ -3,5 +3,6 @@ bin
 tmp
 .vscode
 
-#ignore obj files
+#ignore files
 *.o
+*.code-workspace

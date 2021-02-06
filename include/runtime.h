@@ -32,7 +32,7 @@ namespace lispy{
     public:
         struct pop_guard{
             Closure & rcls;
-            pop_guard(Closure & ref) noexcept : rcls(ref) {}
+            explicit pop_guard(Closure & ref) noexcept : rcls(ref) {}
             pop_guard(const pop_guard & ) = delete;
             pop_guard(pop_guard && ) = delete;
             ~pop_guard() { rcls.pop();}
@@ -47,7 +47,7 @@ namespace lispy{
         [[nodiscard]]
         pop_guard push(Environment & env){
             _cls.emplace_back(std::ref(env));    
-            return *this;
+            return pop_guard{*this};
         }
 
         Environment & global(){
