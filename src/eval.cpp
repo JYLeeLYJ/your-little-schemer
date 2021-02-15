@@ -44,6 +44,32 @@ ast::SExpr eval_lambda(Closure & cls , ast::List & list){
     return lambda;
 }
 
+ast::SExpr eval_and(Closure & cls , ast::List & params){
+    if(params->size() <= 1)
+        throw runtime_error{"parameters cannot be empty."};
+
+    auto ref_result = std::ref(*params.mut().begin());
+    for(auto & conds: subrange(params.mut().begin() + 1 , params.mut().end())){
+        Runtime::eval_sexpr(cls , conds);
+        if(conds == ast::Boolean{false}) return conds;
+        else ref_result = std::ref(conds);
+    }
+    return ref_result.get();
+}
+
+ast::SExpr eval_or(Closure & cls , ast::List & params){
+    if(params->size() <= 1)
+            throw runtime_error{"parameters cannot be empty."};
+
+    auto ref_result = std::ref(*params.mut().begin());
+    for(auto & conds : subrange(params.mut().begin() + 1 , params.mut().end())){
+        Runtime::eval_sexpr(cls , conds);
+        if(conds == ast::Boolean{true}) return conds;
+        else ref_result = std::ref(conds);
+    }
+    return ref_result;
+}
+
 ast::SExpr eval_cond(Closure & cls , ast::List & list){
     if(list->size() < 3 )
         throw bad_syntax(fmt::format("cond : bad syntax , in {} ." , ast::print_sexpr(list)));
@@ -76,11 +102,13 @@ ast::SExpr eval_cond(Closure & cls , ast::List & list){
     return var;
 }
 
-std::unordered_map<std::string_view , ast::SExpr (*) (Closure & , ast::List & )>
-builtin_syntax {
+std::unordered_map builtin_syntax {
+    std::pair
     {"define"sv , eval_def},
     {"lambda"sv , eval_lambda},
-    {"cond"sv , eval_cond},
+    {"cond"sv   , eval_cond},
+    {"and"sv    , eval_and},
+    {"or"sv     , eval_or} ,
 };
 
 ast::SExpr invoke_function(Closure & cls , ast::List & list){
@@ -96,7 +124,7 @@ ast::SExpr invoke_function(Closure & cls , ast::List & list){
         lambda.bounded.mut().emplace_back(e);
     
     //currying 
-    if(lambda.var_names->size() - lambda.bounded->size() > 0){
+    if(lambda.var_names->size() > lambda.bounded->size()){
         return lambda;
     }
     //invoke

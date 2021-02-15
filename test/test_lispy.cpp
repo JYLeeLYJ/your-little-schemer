@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <vector>
 #include "ast.h"
 #include "lispy.h"
 #include "runtime.h"
@@ -54,6 +55,24 @@ TEST(test_lispy , test_define){
     EXPECT_EQ(Runtime::eval("x") , "2");
 }
 
+TEST(test_lispy , test_boolean){
+    std::vector cases {
+        std::pair
+        {"(and #t 1)" , "1"},
+        {"(or #f 1)" , "1"},
+        {"(or (null? '()) (atom? '(d e f g)))" , "true"},
+        {"(and (null? '()) (atom? '(d e f g)))" , "false"},
+        {"(or (null? '(a b c)) (null? '()) )" , "true"},
+        {"(and (null? '(a b c)) (null? '()) )" , "false"},
+        {"(or (null? '(a b c)) (null? '(atom)) )" , "false"},
+        {"(or (null? '()) (atom? 'a) )" , "true"},
+    };
+
+    for(auto & [in , out ] : cases){
+        EXPECT_EQ(Runtime::eval(in) , out);
+    }
+}
+
 TEST(test_lispy , test_builtin){
     EXPECT_EQ(Runtime::eval("(car '(1 2 3))") , "1");
     EXPECT_ANY_THROW(Runtime::eval("(car '())"));
@@ -65,6 +84,9 @@ TEST(test_lispy , test_builtin){
 
     EXPECT_EQ(Runtime::eval("(eq? '(1 2 3) '(1 2 3))") , "false");
     EXPECT_EQ(Runtime::eval("(eq? 1 1)") , "true");
+
+    EXPECT_EQ(Runtime::eval("(add1 67)") , "68");
+    EXPECT_EQ(Runtime::eval("(sub1 5)") , "4");
 }
 
 TEST(test_lispy , test_lambda){

@@ -62,6 +62,12 @@ class schemer{
     const ast::List & _params;
     std::size_t i {1};
 public:
+    schemer(const ast::List & params)
+    :_params(params){
+        if(params->size() <= 1)
+            throw runtime_error{"parameters cannot be empty."};
+    }
+
     schemer(const ast::List & params , std::size_t n_params) 
     : _params(params){
         if(params->empty() || params->size() -1 != n_params) 
@@ -187,6 +193,16 @@ ast::SExpr builtin_zero(Closure & cls , ast::List & params){
     return 0 == get_param_unsafe_cast<ast::Integer>(0 , params);
 }
 
+ast::SExpr builtin_add1(Closure & cls , ast::List & params){
+    schemer(params , 1).type<ast::Integer>();
+    return get_param_unsafe_cast<ast::Integer>(0 , params) + 1;
+}
+
+ast::SExpr builtin_sub1(Closure & cls , ast::List & params){
+    schemer(params , 1).type<ast::Integer>();
+    return get_param_unsafe_cast<ast::Integer>(0 , params) - 1;
+}
+
 ast::SExpr builtin_eval(Closure & cls , ast::List & params){
     schemer(params , 1);
     auto & p = get_param(0 , params);
@@ -242,4 +258,10 @@ void Runtime::init_builtins(){
 
     add_builtin("null?",builtin_null ,1);
     add_builtin("zero?",builtin_zero ,1);
+
+    add_builtin("add1" , builtin_add1,1);
+    add_builtin("sub1" , builtin_sub1,1);
+
+    //set value
+    _global.set("nil" , ast::List{cexpr::vector<ast::SExpr>{}});
 }

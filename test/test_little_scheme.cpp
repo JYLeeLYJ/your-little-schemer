@@ -74,3 +74,136 @@ TEST(test_lispy , test_asserts){
     Runtime::eval("(define l '(beans beans we need jelly beans))");
     EXPECT_EQ(Runtime::eval("(eq? (car l) (car (cdr l)))") , "true");
 }
+
+TEST(test_lispy , test_lat){
+    Runtime::eval(R"(
+        (define lat?
+            (lambda (l)
+                (cond 
+                    ((null? l) #t)
+                    ((atom? (car l)) (lat? (cdr l)))
+                    (else #f)
+        )))
+    )");
+
+    std::vector cases = {
+        std::pair
+        {"(lat? '(Jack Sprat could eat no chicken fat))" , "true"},
+        {"(lat? '((Jack) Sprat could eat no chicken fat))","false"},
+        {"(lat? '(Jack (Sprat could) eat no chicken fat))" , "false"},
+        {"(lat? '())","true"},
+        {"(lat? '(bacon (and eggs)))" , "false"},
+    };
+
+    for(auto && [input , output] : cases){
+        EXPECT_EQ(Runtime::eval(input),output);
+    }
+}
+
+TEST(test_lispy , test_member){
+    Runtime::eval(R"(
+        (define member?
+            (lambda (a lat) 
+            (cond 
+                ((null? lat) #f)
+                (else 
+                    (or 
+                        (eq? (car lat) a) 
+                        (member? a (cdr lat))
+                    )
+                )
+        )))
+    )");
+
+    std::vector cases{
+        std::pair
+        {"(member? 'tea '(coffee tea or milk))" , "true"},
+        {"(member? 'poached '(fried eggs and scrambled eggs))" , "false"},
+        {"(member? 'a '())" , "false"},
+    };
+
+    for(auto & [ in , out] : cases){
+        EXPECT_EQ(Runtime::eval(in) , out);
+    }
+    EXPECT_ANY_THROW(Runtime::eval("(member? 'a 'b)"));
+}
+
+TEST(test_lispy , test_rember){
+    //erase
+    Runtime::eval(R"(
+        (define rember
+            (lambda (a lat)
+            (cond
+                ((null? lat) '())
+                (else (cond
+                    ( ( eq? ( car lat) a) ( cdr lat))
+                    (else (cons (car lat) (rember a ( cdr lat)))))
+                )
+        )))
+    )");
+
+    std::vector cases{
+        std::pair
+        {"(rember 'mint '(lamb chops and mint jelly))"  , "'(lamb chops and jelly)"},
+        {"(rember 'mint '(lamb chops and mint flavored mint jelly))","'(lamb chops and flavored mint jelly)"},
+        {"(rember 'toast '(bacon lettuce and tomato))" , "'(bacon lettuce and tomato)"},
+
+    };
+
+    for(auto & [ in , out ]: cases){
+        EXPECT_EQ(Runtime::eval(in) , out);
+    }
+}
+
+TEST(test_lispy , test_first){
+    Runtime::eval(R"(
+        (define firsts
+            (lambda (l)
+            (cond
+            ((null? l) '())
+            (else ( cons ( car ( car l))
+            (firsts ( cdr l)))))))
+    )");
+
+    std::vector cases{
+        std::pair
+        {"(firsts '((apple peach pumpkin) (plum pear cherry) (grape raisin pea) (bean carrot eggplant)))", "'(apple plum grape bean)"},
+        {"(firsts '((a b) (c d) (e f)))" , "'(a c e)"},
+        {"(firsts '())","'()"},
+        {"(firsts '(((five plums) four) (eleven green oranges) ((no) more)))" , "'((five plums) eleven (no))"},
+    };
+
+    for(auto & [in , out] : cases ){
+        EXPECT_EQ(Runtime::eval(in) , out);
+    }
+}
+
+TEST(test_lispy , test_numbers){
+    Runtime::eval(R"(
+        (define + 
+            (lambda ( n m)
+            (cond
+            ((zero? m) n)
+            (else ( add1 (+ n (sub1 m))))))) 
+    )");
+
+    Runtime::eval(R"(
+        (define -
+            (lambda ( n m)
+            (cond
+            ((zero? m) n)
+            (else ( sub1 (- n (sub1 m))))))) 
+    )");
+
+    std::vector case1{
+        std::pair
+        {"(+ 46 12)" , "58"},
+        {"(- 14 3)" , "11"},
+        {"(- 17 9)" , "8"},
+        {"(- 18 25)" ,"-7"},
+    };
+
+    for(auto & [in , out] : case1){
+        EXPECT_EQ(Runtime::eval(in), out);
+    }
+}
