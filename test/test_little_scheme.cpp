@@ -3,6 +3,7 @@
 #include "runtime.h"
 
 using namespace lispy;
+using namespace std::literals;
 
 TEST(test_lispy , test_car_law){
     EXPECT_EQ(Runtime::eval("(car '(a b c))") , "'a");
@@ -178,9 +179,9 @@ TEST(test_lispy , test_first){
     }
 }
 
-TEST(test_lispy , test_numbers){
+TEST(test_lispy , test_peano_numbers){
     Runtime::eval(R"(
-        (define + 
+        (define +
             (lambda ( n m)
             (cond
             ((zero? m) n)
@@ -195,15 +196,81 @@ TEST(test_lispy , test_numbers){
             (else ( sub1 (- n (sub1 m))))))) 
     )");
 
+    Runtime::eval(R"(
+        (define >
+            (lambda ( n m)
+            (cond
+            ((zero? n) #f)
+            ((zero? m) #t)
+            (else (> (sub1 n) (sub1 m)))))) 
+    )");
+
+    Runtime::eval(R"(
+        (define <
+            (lambda ( n m)
+            (cond
+            ((zero? m) #f)
+            ((zero? n) #t )
+            (else ( < (sub1 n) (sub1 m)))))) 
+    )");
+
+    Runtime::eval(R"(
+        (define =
+            (lambda ( n m)
+            (cond
+            ((> n m) #f)
+            ((< n m) #f )
+            (else #t ))) ) 
+    )");
+
     std::vector case1{
         std::pair
         {"(+ 46 12)" , "58"},
         {"(- 14 3)" , "11"},
         {"(- 17 9)" , "8"},
-        {"(- 18 25)" ,"-7"},
+        {"(- 18 25)" ,"-7"},    //practicallly allow non natural number
+        {"(> 1 3)" , "false"},
+        {"(< 1 1)" , "false"},
+        {"(= 2 2)" , "true"},
+        {"(= 1 10)" , "false"}
     };
 
     for(auto & [in , out] : case1){
         EXPECT_EQ(Runtime::eval(in), out);
     }
+}
+
+TEST(test_lispy , test_y){
+    auto define_Y = R"(
+    (define Y
+        (lambda (F)
+        ((lambda (f)
+            (lambda (n)
+            ((F (f f)) n)))
+        (lambda (f)
+            (lambda (n)
+            ((F (f f)) n)))))
+
+    )
+    )"sv;
+
+    auto define_fibb = R"(
+    (define fibb  
+        (lambda (fib)
+        (lambda (n)
+            (cond 
+                ((= n 0) 0)
+                ((= n 1) 1)
+                (else (+ (fib (- n 1)) (fib (- n 2))))
+            )
+        ))
+    )
+    )"sv;
+
+    Runtime::eval(define_Y);
+    Runtime::eval(define_fibb);
+
+    EXPECT_EQ(Runtime::eval("((Y fibb) 0)"),"0");
+    EXPECT_EQ(Runtime::eval("((Y fibb) 1)"),"1");
+    EXPECT_EQ(Runtime::eval("((Y fibb) 5)"),"5");
 }

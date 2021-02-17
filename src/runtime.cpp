@@ -203,6 +203,47 @@ ast::SExpr builtin_sub1(Closure & cls , ast::List & params){
     return get_param_unsafe_cast<ast::Integer>(0 , params) - 1;
 }
 
+ast::SExpr builtin_add(Closure & cls , ast::List & params){
+    schemer(params , 2)
+    .type<ast::Integer>().next()
+    .type<ast::Integer>();
+
+    const auto & lhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    const auto & rhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    return lhs + rhs;
+}
+
+ast::SExpr builtin_sub(Closure & cls , ast::List & params){
+    schemer(params , 2)
+    .type<ast::Integer>().next()
+    .type<ast::Integer>();
+
+    const auto & lhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    const auto & rhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    return lhs - rhs;
+}
+
+ast::SExpr builin_div(Closure & cls ,ast::List & params){
+    schemer(params , 2)
+    .type<ast::Integer>().next()
+    .type<ast::Integer>();
+
+    const auto & lhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    const auto & rhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    if(rhs == 0) throw runtime_error{"div 0."};
+    return lhs / rhs;
+}
+
+ast::SExpr builtin_mut(Closure & cls , ast::List & params){
+    schemer(params , 2)
+    .type<ast::Integer>().next()
+    .type<ast::Integer>();
+
+    const auto & lhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    const auto & rhs = get_param_unsafe_cast<ast::Integer>(0 , params);
+    return lhs * rhs;
+}
+
 ast::SExpr builtin_eval(Closure & cls , ast::List & params){
     schemer(params , 1);
     auto & p = get_param(0 , params);

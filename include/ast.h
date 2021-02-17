@@ -23,6 +23,7 @@ namespace ast{
     struct Lambda {
         cexpr::cow<cexpr::vector<SExpr>> bounded;
         cexpr::cow<cexpr::vector<std::string_view>> var_names;
+        cexpr::cow<cexpr::vector<std::pair<std::string_view,SExpr>>> free_vars;
         cexpr::cow<SExpr>   body;
         bool operator ==(const Lambda &) const = default;
     };

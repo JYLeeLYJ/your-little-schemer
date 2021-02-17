@@ -27,6 +27,22 @@ ast::SExpr eval_def(Closure & cls , ast::List & list){
     return iden;
 }
 
+using FreeVarList= cexpr::cow<cexpr::vector<std::pair<std::string_view , ast::SExpr>>>;
+void scan_and_capture(Closure & cls , FreeVarList & free_vars , const ast::List & list){
+    for(auto & e : list.ref()){
+        e.match(overloaded{
+            [&](ast::Symbol sym){
+                auto var = cls.find(sym);
+                if(var) free_vars.mut().emplace_back(sym , *var);
+            },
+            [&](const ast::List & list){
+                scan_and_capture(cls , free_vars , list);
+            },
+            [](auto && _){}
+        });
+    }
+}
+
 ast::SExpr eval_lambda(Closure & cls , ast::List & list){
     if(list->size() != 3 || !list.ref()[1].holds<ast::List>()) 
         throw bad_syntax(fmt::format("lambda : bad syntax , in {} . " , ast::print_sexpr(ast::SExpr{list}))); 
@@ -40,6 +56,8 @@ ast::SExpr eval_lambda(Closure & cls , ast::List & list){
 
     for(auto & e : params.ref()) 
         lambda.var_names.mut().emplace_back(e.get<ast::Symbol>());
+    
+    scan_and_capture(cls , lambda.free_vars , list);
 
     return lambda;
 }
@@ -130,6 +148,9 @@ ast::SExpr invoke_function(Closure & cls , ast::List & list){
     //invoke
     else{
         Environment tmp_env{};
+        for(auto & [k , v]: lambda.free_vars.ref()){
+            tmp_env.set(k , v);
+        }
         for(std::size_t i = 0 ; i < lambda.var_names->size() ; ++i){
             tmp_env.set(lambda.var_names.ref()[i] , lambda.bounded.ref()[i]);
         }
